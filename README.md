@@ -1,1 +1,1 @@
-# path-plotter
+# Graphing Calculator
