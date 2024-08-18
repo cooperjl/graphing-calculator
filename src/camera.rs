@@ -110,24 +110,12 @@ impl CameraController {
         let forward_mag = forward.magnitude();
 
         if self.is_forward_pressed && forward_mag > self.speed {
-            camera.eye += forward_norm * self.speed;
+            //std::thread::sleep(std::time::Duration::from_millis(100));
+            camera.eye += forward_norm * self.speed;// * 100.0;
         }
         if self.is_backward_pressed {
-            camera.eye -= forward_norm * self.speed;
-        }
-
-        let right = forward_norm.cross(camera.up);
-
-        let forward = camera.target - camera.eye;
-        let forward_mag = forward.magnitude();
-
-        if self.is_right_pressed {
-            camera.eye = camera.target - (forward + right * self.speed).normalize() * forward_mag;
-        }
-
-        if self.is_left_pressed {
-            camera.eye = camera.target - (forward - right * self.speed).normalize() * forward_mag;
+            //std::thread::sleep(std::time::Duration::from_millis(100));
+            camera.eye -= forward_norm * self.speed;// * 100.0;
         }
     }
-
 }

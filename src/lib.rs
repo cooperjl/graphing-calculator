@@ -69,7 +69,7 @@ impl<'a> State<'a> {
         };
 
         let camera = camera::Camera {
-            eye: (0.0, 0.0, 2.0).into(),
+            eye: (0.0, 0.0, 4.0).into(),
             target: (0.0, 0.0, 0.0).into(),
             up: cgmath::Vector3::unit_y(),
             aspect: config.width as f32 / config.height as f32,
@@ -116,7 +116,7 @@ impl<'a> State<'a> {
             label: Some("camera_bind_group"),
         });
 
-        let camera_controller = camera::CameraController::new(0.2);
+        let camera_controller = camera::CameraController::new(0.01);
 
         let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Render Pipeline Layout"),
@@ -167,6 +167,7 @@ impl<'a> State<'a> {
         self.camera_controller.update_camera(&mut self.camera);
         self.camera_uniform.update_view_proj(&self.camera);
         self.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.camera_uniform]));
+        self.grid.update_grid(&self.device, &self.camera);
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {

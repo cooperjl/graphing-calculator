@@ -2,6 +2,7 @@ use wgpu::{self, include_wgsl, util::DeviceExt};
 use cgmath::prelude::*;
 
 use crate::vertex::{Vertex, Instance, InstanceRaw};
+use crate::camera;
 
 pub struct Grid {
     pub render_pipeline: wgpu::RenderPipeline,
@@ -21,22 +22,24 @@ const LINE_VERTICAL: &[Vertex] = &[
     Vertex { position: [0.0, -100.0, 0.0] },
 ];
 
-fn get_instances() -> Vec<Instance> {
-    let mut instances: Vec<Instance> = vec![];
-    let sf = 10.0; // TODO integrate this with zoom scale factor
+fn get_instances(camera: &camera::Camera) -> Vec<Instance> {
+    let base_spacing = 20;
+    let sf = base_spacing as f32 / (camera.eye.z as u32).next_power_of_two() as f32;
 
-    for i in -20..20 {
+    let mut instances: Vec<Instance> = vec![];
+
+    for i in -base_spacing*2..base_spacing*2 {
         let position = cgmath::Vector3 { x: i as f32 / sf, y: i as f32 / sf, z: 0.0 };
         let rotation = if position.is_zero() {
             cgmath::Quaternion::from_axis_angle(cgmath::Vector3::unit_z(), cgmath::Deg(0.0))
         } else {
             cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(0.0))
         };
-        
+
         let a = match i {
-            0 => 1.0,
+            0 => 1.0,//1.0
             x if x % 5 == 0 => 0.7,
-            _ => 0.4,
+            _ => 0.4, //0.4
         };
 
         let color = [0.0, 0.0, 0.0, a];
@@ -109,7 +112,7 @@ impl Grid {
         );
 
 
-        let instances = get_instances();
+        let instances = vec![];
 
         let instance_data = instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
 
@@ -129,4 +132,18 @@ impl Grid {
             instances,
         }
     }
+    
+    pub fn update_grid(&mut self, device: &wgpu::Device, camera: &camera::Camera) {
+        self.instances = get_instances(camera);
+        let instance_data = self.instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
+
+        self.instance_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Grid Instance Buffer"),
+                contents: bytemuck::cast_slice(&instance_data),
+                usage: wgpu::BufferUsages::VERTEX,
+            }
+        );
+    }
 }
+

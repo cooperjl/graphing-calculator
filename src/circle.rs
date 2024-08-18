@@ -92,7 +92,7 @@ impl PointPipeline {
         });
 
 
-        let circle = Circle::new(0.02, 32);
+        let circle = Circle::new(0.05, 32);
 
         let vertex_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
@@ -114,7 +114,7 @@ impl PointPipeline {
 
         let mut instances = vec![];
 
-        let position = cgmath::Vector3 { x: 0.3, y: 0.3, z: 0.0 };
+        let position = cgmath::Vector3 { x: 1.0, y: 1.0, z: 0.0 };
 
         let rotation = if position.is_zero() {
             cgmath::Quaternion::from_axis_angle(cgmath::Vector3::unit_z(), cgmath::Deg(0.0))
