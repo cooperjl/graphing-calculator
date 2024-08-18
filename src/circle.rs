@@ -1,9 +1,11 @@
-use crate::vertex::{Vertex, Instance, InstanceRaw};
-
 use wgpu::{self, include_wgsl, util::DeviceExt};
 use cgmath::prelude::*;
 
+use crate::vertex::{Vertex, Instance, InstanceRaw};
+use crate::camera;
+
 pub struct Circle {
+    pub radius: f32,
     pub segments: u32,
     pub vertices: Vec<Vertex>,
     pub indices: Vec<[u32; 3]>,
@@ -33,6 +35,7 @@ impl Circle {
         }
 
         Self {
+            radius,
             segments,
             vertices,
             indices,
@@ -47,6 +50,7 @@ pub struct PointPipeline {
     pub num_indices: u32,
     pub instance_buffer: wgpu::Buffer,
     pub instances: Vec<Instance>,
+    pub circle: Circle,
 }
 
 impl PointPipeline {
@@ -92,7 +96,7 @@ impl PointPipeline {
         });
 
 
-        let circle = Circle::new(0.05, 32);
+        let circle = Circle::new(0.01, 32);
 
         let vertex_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
@@ -122,7 +126,7 @@ impl PointPipeline {
             cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(0.0))
         };
 
-        let color = [0.0, 0.0, 0.0, 1.0];
+        let color = [0.0, 0.0, 1.0, 1.0];
 
         instances.push(Instance {
             position,
@@ -146,6 +150,28 @@ impl PointPipeline {
             num_indices,
             instance_buffer,
             instances,
+            circle,
         }
+    }
+
+    pub fn update_points(&mut self, device: &wgpu::Device, camera: &camera::Camera) {
+        let circle = Circle::new(self.circle.radius * camera.eye.z, self.circle.segments);
+
+        self.vertex_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Vertex Buffer"),
+                contents: bytemuck::cast_slice(&circle.vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            }
+        );
+        
+        self.index_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Index Buffer"),
+                contents: bytemuck::cast_slice(&circle.indices),
+                usage: wgpu::BufferUsages::INDEX,
+            }
+        );
+
     }
 }

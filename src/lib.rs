@@ -168,6 +168,7 @@ impl<'a> State<'a> {
         self.camera_uniform.update_view_proj(&self.camera);
         self.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.camera_uniform]));
         self.grid.update_grid(&self.device, &self.camera);
+        self.point_pipeline.update_points(&self.device, &self.camera);
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -199,12 +200,6 @@ impl<'a> State<'a> {
         });
 
         render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
-        // point rendering
-        render_pass.set_pipeline(&self.point_pipeline.render_pipeline);
-        render_pass.set_vertex_buffer(0, self.point_pipeline.vertex_buffer.slice(..));
-        render_pass.set_vertex_buffer(1, self.point_pipeline.instance_buffer.slice(..));
-        render_pass.set_index_buffer(self.point_pipeline.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-        render_pass.draw_indexed(0..self.point_pipeline.num_indices, 0, 0..self.point_pipeline.instances.len() as _);
         // grid rendering
         render_pass.set_pipeline(&self.grid.render_pipeline);
         render_pass.set_vertex_buffer(0, self.grid.vertical_buffer.slice(..));
@@ -212,6 +207,12 @@ impl<'a> State<'a> {
         render_pass.draw(0..2, 0..self.grid.instances.len() as _);
         render_pass.set_vertex_buffer(0, self.grid.horizontal_buffer.slice(..));
         render_pass.draw(0..2, 0..self.grid.instances.len() as _);
+        // point rendering
+        render_pass.set_pipeline(&self.point_pipeline.render_pipeline);
+        render_pass.set_vertex_buffer(0, self.point_pipeline.vertex_buffer.slice(..));
+        render_pass.set_vertex_buffer(1, self.point_pipeline.instance_buffer.slice(..));
+        render_pass.set_index_buffer(self.point_pipeline.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+        render_pass.draw_indexed(0..self.point_pipeline.num_indices, 0, 0..self.point_pipeline.instances.len() as _);
         
         drop(render_pass);
 
