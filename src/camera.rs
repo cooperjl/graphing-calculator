@@ -111,11 +111,11 @@ impl CameraController {
 
         if self.is_forward_pressed && forward_mag > self.speed {
             //std::thread::sleep(std::time::Duration::from_millis(100));
-            camera.eye += forward_norm * self.speed;// * 100.0;
+            camera.eye += forward_norm * forward_mag * self.speed;// * 100.0;
         }
         if self.is_backward_pressed {
             //std::thread::sleep(std::time::Duration::from_millis(100));
-            camera.eye -= forward_norm * self.speed;// * 100.0;
+            camera.eye -= forward_norm * forward_mag * self.speed;// * 100.0;
         }
     }
 }

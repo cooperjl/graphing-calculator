@@ -12,16 +12,6 @@ pub struct Grid {
     pub instances: Vec<Instance>,
 }
 
-const LINE_HORIZONTAL: &[Vertex] = &[
-    Vertex { position: [-100.0, 0.0, 0.0] },
-    Vertex { position: [100.0, 0.0, 0.0] },
-];
-
-const LINE_VERTICAL: &[Vertex] = &[
-    Vertex { position: [0.0, 100.0, 0.0] },
-    Vertex { position: [0.0, -100.0, 0.0] },
-];
-
 fn get_instances(camera: &camera::Camera) -> Vec<Instance> {
     let base_spacing = 20;
     let sf = base_spacing as f32 / (camera.eye.z as u32).next_power_of_two() as f32;
@@ -98,7 +88,7 @@ impl Grid {
         let horizontal_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
                 label: Some("Horizontal Grid Buffer"),
-                contents: bytemuck::cast_slice(&LINE_HORIZONTAL),
+                contents: &[],
                 usage: wgpu::BufferUsages::VERTEX,
             }
         );
@@ -106,23 +96,20 @@ impl Grid {
         let vertical_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
                 label: Some("Horizontal Grid Buffer"),
-                contents: bytemuck::cast_slice(&LINE_VERTICAL),
+                contents: &[],
                 usage: wgpu::BufferUsages::VERTEX,
             }
         );
-
-
-        let instances = vec![];
-
-        let instance_data = instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
 
         let instance_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
                 label: Some("Grid Instance Buffer"),
-                contents: bytemuck::cast_slice(&instance_data),
+                contents: &[],
                 usage: wgpu::BufferUsages::VERTEX,
             }
         );
+
+        let instances = vec![];
 
         Self {
             render_pipeline,
@@ -135,7 +122,39 @@ impl Grid {
     
     pub fn update_grid(&mut self, device: &wgpu::Device, camera: &camera::Camera) {
         self.instances = get_instances(camera);
+        self.set_buffers(device, camera.eye.z);
+    }
+
+    fn set_buffers(&mut self, device: &wgpu::Device, sf: f32) {
+        let line_limit = sf * 1.5;
+
+        let line_horizontal: &[Vertex] = &[
+            Vertex { position: [-line_limit, 0.0, 0.0] },
+            Vertex { position: [line_limit, 0.0, 0.0] },
+        ];
+
+        let line_vertical: &[Vertex] = &[
+            Vertex { position: [0.0, line_limit, 0.0] },
+            Vertex { position: [0.0, -line_limit, 0.0] },
+        ];
+
         let instance_data = self.instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
+
+        self.horizontal_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Horizontal Grid Buffer"),
+                contents: bytemuck::cast_slice(&line_horizontal),
+                usage: wgpu::BufferUsages::VERTEX,
+            }
+        );
+
+        self.vertical_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Horizontal Grid Buffer"),
+                contents: bytemuck::cast_slice(&line_vertical),
+                usage: wgpu::BufferUsages::VERTEX,
+            }
+        );
 
         self.instance_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
@@ -144,6 +163,7 @@ impl Grid {
                 usage: wgpu::BufferUsages::VERTEX,
             }
         );
+        
     }
 }
 
