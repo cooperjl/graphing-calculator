@@ -6,7 +6,7 @@ use wgpu::{self, util::DeviceExt};
 
 mod vertex;
 mod camera;
-mod circle;
+mod points;
 mod grid;
 
 struct State<'a> {
@@ -22,7 +22,7 @@ struct State<'a> {
     camera_bind_group: wgpu::BindGroup,
     camera_controller: camera::CameraController,
     grid: grid::Grid,
-    point_pipeline: circle::PointPipeline,
+    point_pipeline: points::PointPipeline,
 }
 
 impl<'a> State<'a> {
@@ -126,7 +126,7 @@ impl<'a> State<'a> {
             push_constant_ranges: &[],
         });
 
-        let point_pipeline = circle::PointPipeline::new(&device, &render_pipeline_layout, &config);
+        let point_pipeline = points::PointPipeline::new(&device, &render_pipeline_layout, &config);
         let grid = grid::Grid::new(&device, &render_pipeline_layout, &config);
 
         Self {
@@ -167,8 +167,8 @@ impl<'a> State<'a> {
         self.camera_controller.update_camera(&mut self.camera);
         self.camera_uniform.update_view_proj(&self.camera);
         self.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.camera_uniform]));
-        self.grid.update_grid(&self.device, &self.camera);
-        self.point_pipeline.update_points(&self.device, &self.camera);
+        self.grid.update_grid(&self.queue, &self.camera);
+        self.point_pipeline.update_points(&self.queue, &self.camera);
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {

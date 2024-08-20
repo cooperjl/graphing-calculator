@@ -3,9 +3,8 @@
 
 pub struct Vertex {
     pub position: [f32; 3],
-    //pub color: [f32; 4],
 }
-// TODO remove color from the vertex since tis overwritten by the instance color
+
 impl Vertex {
     pub fn desc() -> wgpu::VertexBufferLayout<'static> {
         wgpu::VertexBufferLayout {

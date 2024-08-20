@@ -20,7 +20,7 @@ impl Circle {
         indices.push([1, segments, 0]);
 
         for s in 0..segments {
-            // we trace the circle and place points along it
+            // trace the circle and place points along it
             let current_seg = (2.0 * std::f32::consts::PI) * (s as f32 / segments as f32);
 
             let x = radius * current_seg.cos();
@@ -102,7 +102,7 @@ impl PointPipeline {
             &wgpu::util::BufferInitDescriptor {
                 label: Some("Vertex Buffer"),
                 contents: bytemuck::cast_slice(&circle.vertices),
-                usage: wgpu::BufferUsages::VERTEX,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             }
         );
         
@@ -110,7 +110,7 @@ impl PointPipeline {
             &wgpu::util::BufferInitDescriptor {
                 label: Some("Index Buffer"),
                 contents: bytemuck::cast_slice(&circle.indices),
-                usage: wgpu::BufferUsages::INDEX,
+                usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
             }
         );
 
@@ -154,24 +154,10 @@ impl PointPipeline {
         }
     }
 
-    pub fn update_points(&mut self, device: &wgpu::Device, camera: &camera::Camera) {
+    pub fn update_points(&mut self, queue: &wgpu::Queue, camera: &camera::Camera) {
         let circle = Circle::new(self.circle.radius * camera.eye.z, self.circle.segments);
 
-        self.vertex_buffer = device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("Vertex Buffer"),
-                contents: bytemuck::cast_slice(&circle.vertices),
-                usage: wgpu::BufferUsages::VERTEX,
-            }
-        );
-        
-        self.index_buffer = device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("Index Buffer"),
-                contents: bytemuck::cast_slice(&circle.indices),
-                usage: wgpu::BufferUsages::INDEX,
-            }
-        );
-
+        queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&circle.vertices));
+        queue.write_buffer(&self.index_buffer, 0, bytemuck::cast_slice(&circle.indices));
     }
 }
