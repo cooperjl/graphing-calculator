@@ -107,16 +107,17 @@ impl Text {
 
             let cgmath::Vector2 { x, y } = camera.world_to_screen_space(instance.position, size);
 
-            let offset = i as f32 * self.spacing;
+            let bound_offset = i as f32 * self.spacing;
+            let position_offset = self.text_size / 2.0;
 
             // x axis
             let text_area = glyphon::TextArea {
                 buffer: &self.text_buffer,
-                left: x,
-                top:  center_height - offset,
+                left: if instance.position.x == 0.0 { center_width } else { x - position_offset },
+                top:  center_height - bound_offset,
                 scale: 1.0,
                 bounds: glyphon::TextBounds {
-                    left: x as i32,
+                    left: (x - position_offset) as i32,
                     top: center_height as i32,
                     right: size.width as i32,
                     bottom: (center_height + self.text_size) as i32,
@@ -129,13 +130,13 @@ impl Text {
             let text_area = glyphon::TextArea {
                 buffer: &self.text_buffer,
                 left: center_width,
-                top: y - offset,
+                top: y - bound_offset - position_offset,
                 scale: 1.0,
                 bounds: glyphon::TextBounds {
                     left: center_width as i32,
-                    top: y as i32,
+                    top: (y - position_offset) as i32,
                     right: size.width as i32,
-                    bottom: (y + self.text_size) as i32,
+                    bottom: (y + self.text_size - position_offset) as i32,
                 },
                 default_color: glyphon::Color::rgb(0, 0, 0),
             };
