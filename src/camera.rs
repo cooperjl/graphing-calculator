@@ -1,5 +1,5 @@
 use winit::keyboard::{KeyCode, PhysicalKey};
-use winit::event::{ElementState, KeyEvent, WindowEvent};
+use winit::event::{ElementState, KeyEvent, MouseScrollDelta, WindowEvent};
 
 #[rustfmt::skip]
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
@@ -68,6 +68,7 @@ pub struct CameraController {
     is_backward_pressed: bool,
     is_left_pressed: bool,
     is_right_pressed: bool,
+    scroll: f32,
 }
 
 impl CameraController {
@@ -78,6 +79,7 @@ impl CameraController {
             is_backward_pressed: false,
             is_left_pressed: false,
             is_right_pressed: false,
+            scroll: 0.0,
         }
     }
 
@@ -112,24 +114,36 @@ impl CameraController {
                     }
                     _ => false,
                 }
-            }
+            },
+            WindowEvent::MouseWheel {
+                delta,
+                ..
+            } => {
+                match delta {
+                    MouseScrollDelta::LineDelta(_x, y) => {
+                        self.scroll = *y;
+                        true
+                    }
+                    _ => false,
+                }
+            },
             _ => false,
         }
     }
 
-    pub fn update_camera(&self, camera: &mut Camera) {
+    pub fn update_camera(&mut self, camera: &mut Camera) {
         use cgmath::InnerSpace;
         let forward = camera.target - camera.eye;
         let forward_norm = forward.normalize();
         let forward_mag = forward.magnitude();
-
+        
         if self.is_forward_pressed && forward_mag > self.speed {
-            //std::thread::sleep(std::time::Duration::from_millis(100));
-            camera.eye += forward_norm * forward_mag * self.speed;// * 100.0;
         }
         if self.is_backward_pressed {
-            //std::thread::sleep(std::time::Duration::from_millis(100));
-            camera.eye -= forward_norm * forward_mag * self.speed;// * 100.0;
+        }
+        if self.scroll != 0.0 {
+            camera.eye += forward_norm * forward_mag * self.speed * self.scroll;
+            self.scroll = 0.0;
         }
     }
 }

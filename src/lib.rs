@@ -117,7 +117,7 @@ impl<'a> State<'a> {
             label: Some("camera_bind_group"),
         });
 
-        let camera_controller = camera::CameraController::new(0.001);
+        let camera_controller = camera::CameraController::new(0.1);
 
         let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Render Pipeline Layout"),
