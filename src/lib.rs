@@ -22,6 +22,7 @@ struct State<'a> {
     camera_bind_group: wgpu::BindGroup,
     camera_controller: camera::CameraController,
     grid: grid::Grid,
+    grid_text: grid::Text,
     point_pipeline: points::PointPipeline,
 }
 
@@ -128,6 +129,7 @@ impl<'a> State<'a> {
 
         let point_pipeline = points::PointPipeline::new(&device, &render_pipeline_layout, &config);
         let grid = grid::Grid::new(&device, &render_pipeline_layout, &config);
+        let grid_text = grid::Text::new(&device, &queue, size);
 
         Self {
             surface,
@@ -142,6 +144,7 @@ impl<'a> State<'a> {
             camera_bind_group,
             camera_controller,
             grid,
+            grid_text,
             point_pipeline,
         }
     }
@@ -156,6 +159,7 @@ impl<'a> State<'a> {
             self.config.width = new_size.width;
             self.config.height = new_size.height;
             self.surface.configure(&self.device, &self.config);
+            self.grid_text.resize(new_size);
         }
     }
 
@@ -169,9 +173,12 @@ impl<'a> State<'a> {
         self.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.camera_uniform]));
         self.grid.update_grid(&self.queue, &self.camera);
         self.point_pipeline.update_points(&self.queue, &self.camera);
+        self.grid_text.viewport.update(&self.queue, glyphon::Resolution { width: self.config.width, height: self.config.height });
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+        self.grid_text.prepare(&self.device, &self.queue, self.size, &self.grid.instances, &self.camera);
+
         let output = self.surface.get_current_texture()?;
 
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
@@ -185,12 +192,7 @@ impl<'a> State<'a> {
                 view: &view,
                 resolve_target: None,
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color {
-                        r: 1.0,
-                        g: 1.0,
-                        b: 1.0,
-                        a: 1.0,
-                    }),
+                    load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
                     store: wgpu::StoreOp::Store,
                 },
             })],
@@ -213,11 +215,14 @@ impl<'a> State<'a> {
         render_pass.set_vertex_buffer(1, self.point_pipeline.instance_buffer.slice(..));
         render_pass.set_index_buffer(self.point_pipeline.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
         render_pass.draw_indexed(0..self.point_pipeline.num_indices, 0, 0..self.point_pipeline.instances.len() as _);
+
+        self.grid_text.text_renderer.render(&self.grid_text.atlas, &self.grid_text.viewport, &mut render_pass).unwrap();
         
         drop(render_pass);
 
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
+        self.grid_text.atlas.trim();
 
         Ok(())
     }

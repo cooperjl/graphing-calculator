@@ -27,6 +27,20 @@ impl Camera {
         
         return OPENGL_TO_WGPU_MATRIX * proj * view;
     }
+
+    pub fn world_to_screen_space(&self, pos: cgmath::Vector3<f32>, size: winit::dpi::PhysicalSize<u32>) -> cgmath::Vector2<f32> {
+        // convert from world space to camera space
+        let pos = self.build_view_projection_matrix() * cgmath::vec4(pos.x, pos.y, pos.z, 1.0);
+        
+        // convert from camera space to screen space
+        let x = (size.width as f32 * ((pos.x / pos.w) + 1.0)) / 2.0;
+        let y = (size.height as f32 * ((pos.y / pos.w) - 1.0)) / -2.0;
+
+        cgmath::Vector2 {
+            x,
+            y,
+        }
+    }
 }
 
 #[repr(C)]
