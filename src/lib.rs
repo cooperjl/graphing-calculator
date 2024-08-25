@@ -129,7 +129,7 @@ impl<'a> State<'a> {
 
         let point_pipeline = points::PointPipeline::new(&device, &render_pipeline_layout, &config);
         let grid = grid::Grid::new(&device, &render_pipeline_layout, &config);
-        let grid_text = grid::Text::new(&device, &queue, size);
+        let grid_text = grid::Text::new(&device, &queue, surface_format, size);
 
         Self {
             surface,

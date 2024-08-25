@@ -49,14 +49,13 @@ pub struct Text {
 }
 
 impl Text {
-    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, size: winit::dpi::PhysicalSize<u32>) -> Self {
-        let swapchain_format = wgpu::TextureFormat::Bgra8UnormSrgb;
+    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, format: wgpu::TextureFormat, size: winit::dpi::PhysicalSize<u32>) -> Self {
         let mut font_system = glyphon::FontSystem::new();
         let swash_cache = glyphon::SwashCache::new();
         let cache = glyphon::Cache::new(&device);
         let viewport = glyphon::Viewport::new(&device, &cache);
 
-        let mut atlas = glyphon::TextAtlas::new(device, queue, &cache, swapchain_format);
+        let mut atlas = glyphon::TextAtlas::new(device, queue, &cache, format);
         let text_renderer = glyphon::TextRenderer::new(&mut atlas, device, wgpu::MultisampleState::default(), None);
         let text_size = 21.0;
         let spacing = text_size;
