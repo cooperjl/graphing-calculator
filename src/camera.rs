@@ -137,13 +137,20 @@ impl CameraController {
         let forward_norm = forward.normalize();
         let forward_mag = forward.magnitude();
         
+        let change = forward_norm * forward_mag * self.speed * self.scroll;
+        let next_power_of_two = ((camera.eye.z + change.z) as u32).checked_next_power_of_two(); 
+
+        if self.scroll > 0.0 && camera.eye.z >= 1.0 {
+            camera.eye += change;
+            self.scroll = 0.0;
+        }
+        if self.scroll < 0.0 && next_power_of_two.is_some() {
+            camera.eye += change;
+            self.scroll = 0.0;
+        }
         if self.is_forward_pressed && forward_mag > self.speed {
         }
         if self.is_backward_pressed {
-        }
-        if self.scroll != 0.0 {
-            camera.eye += forward_norm * forward_mag * self.speed * self.scroll;
-            self.scroll = 0.0;
         }
     }
 }
