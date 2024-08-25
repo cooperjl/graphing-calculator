@@ -50,7 +50,7 @@ pub struct Text {
 
 impl Text {
     pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, size: winit::dpi::PhysicalSize<u32>) -> Self {
-        let swapchain_format = wgpu::TextureFormat::Rgba8UnormSrgb;
+        let swapchain_format = wgpu::TextureFormat::Bgra8UnormSrgb;
         let mut font_system = glyphon::FontSystem::new();
         let swash_cache = glyphon::SwashCache::new();
         let cache = glyphon::Cache::new(&device);
