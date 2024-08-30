@@ -4,16 +4,27 @@ use cgmath::prelude::*;
 use crate::vertex::{Vertex, Instance, InstanceRaw};
 use crate::camera;
 
-fn get_instances(camera: &camera::Camera) -> Vec<Instance> {
+fn get_instances(camera: &camera::Camera, vertical: bool) -> Vec<Instance> {
     let base_spacing = 20.0;
     let sf = base_spacing / (camera.eye.z as u32).next_power_of_two() as f32;
 
     let mut instances: Vec<Instance> = vec![];
 
-    let bound = (base_spacing * 1.5) as i32;
+    let bound_l = (base_spacing * -1.5) as i32;
+    let bound_r = (base_spacing * 1.5) as i32;
 
-    for i in -bound..bound {
-        let position = cgmath::Vector3 { x: i as f32 / sf, y: i as f32 / sf, z: 0.0 };
+    for i in bound_l..bound_r {
+        let x = if vertical {
+            i as f32 / sf
+        } else {
+            0.0
+        };
+        let y = if !vertical {
+            i as f32 / sf
+        } else {
+            0.0
+        };
+        let position = cgmath::Vector3 { x, y, z: 0.0 };
         let rotation = if position.is_zero() {
             cgmath::Quaternion::from_axis_angle(cgmath::Vector3::unit_z(), cgmath::Deg(0.0))
         } else {
@@ -43,7 +54,8 @@ pub struct Text {
     pub viewport: glyphon::Viewport,
     pub atlas: glyphon::TextAtlas,
     pub text_renderer: glyphon::TextRenderer,
-    pub text_buffer: glyphon::Buffer,
+    pub x_text_buffer: glyphon::Buffer,
+    pub y_text_buffer: glyphon::Buffer,
     pub text_size: f32,
     pub spacing: f32,
 }
@@ -59,18 +71,26 @@ impl Text {
         let text_renderer = glyphon::TextRenderer::new(&mut atlas, device, wgpu::MultisampleState::default(), None);
         let text_size = 21.0;
         let spacing = text_size;
-        let mut text_buffer = glyphon::Buffer::new(&mut font_system, glyphon::Metrics::new(text_size, spacing));
+        let mut x_text_buffer = glyphon::Buffer::new(&mut font_system, glyphon::Metrics::new(text_size, spacing));
+        let mut y_text_buffer = glyphon::Buffer::new(&mut font_system, glyphon::Metrics::new(text_size, spacing));
 
         let physical_width = size.width as f32 * 2.0;
         let physical_height = size.height as f32 * 2.0;
 
-        text_buffer.set_size(
+        x_text_buffer.set_size(
             &mut font_system,
             Some(physical_width),
             Some(physical_height),
         );
 
-        text_buffer.shape_until_scroll(&mut font_system, false);
+        y_text_buffer.set_size(
+            &mut font_system,
+            Some(physical_width),
+            Some(physical_height),
+        );
+
+        x_text_buffer.shape_until_scroll(&mut font_system, false);
+        y_text_buffer.shape_until_scroll(&mut font_system, false);
 
         Self {
             font_system,
@@ -78,68 +98,79 @@ impl Text {
             viewport,
             atlas,
             text_renderer,
-            text_buffer,
+            x_text_buffer,
+            y_text_buffer,
             text_size,
             spacing,
         }
     }
-    
-    pub fn prepare(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, size: winit::dpi::PhysicalSize<u32>, instances: &Vec<Instance>, camera: &camera::Camera) {
-        let mut text: String = "".to_owned();
-        for (i, instance) in instances.iter().enumerate() {
+    pub fn prepare(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, size: winit::dpi::PhysicalSize<u32>, camera: &camera::Camera, vertical_instances: &Vec<Instance>, horizontal_instances: &Vec<Instance>) {
+        let mut y_text: String = "".to_owned();
+        for (i, instance) in horizontal_instances.iter().enumerate() {
             let num = instance.position.y as f32;
             if i % 5 == 0 {
-                text.push_str(format!("{num}").as_str());
+                y_text.push_str(format!("{num}").as_str());
             } 
-            text.push_str("\n");
+            y_text.push_str("\n");
+        }
+        let mut x_text: String = "".to_owned();
+        for (i, instance) in vertical_instances.iter().enumerate() {
+            let num = instance.position.x as f32;
+            if i % 5 == 0 {
+                x_text.push_str(format!("{num}").as_str());
+            } 
+            x_text.push_str("\n");
         }
 
         let attrs = glyphon::Attrs::new()
             .family(glyphon::Family::Monospace);
 
-        self.text_buffer.set_text(&mut self.font_system, text.as_str(), attrs, glyphon::Shaping::Advanced);
+        self.x_text_buffer.set_text(&mut self.font_system, x_text.as_str(), attrs, glyphon::Shaping::Advanced);
+        self.y_text_buffer.set_text(&mut self.font_system, y_text.as_str(), attrs, glyphon::Shaping::Advanced);
+
+        let axis_pos = camera.world_to_screen_space(-camera.eye.to_vec(), size);
+        let position_offset = self.text_size / 2.0;
 
         let mut text_areas: Vec<glyphon::TextArea> = vec![];
-        for (i, instance) in instances.iter().enumerate() {
-            let center_width = size.width as f32 / 2.0;
-            let center_height = size.height as f32 / 2.0;
-
-            let cgmath::Vector2 { x, y } = camera.world_to_screen_space(instance.position, size);
+        for (i, instance) in vertical_instances.iter().enumerate() {
+            let text_pos = camera.world_to_screen_space(instance.position, size);
 
             let bound_offset = i as f32 * self.spacing;
-            let position_offset = self.text_size / 2.0;
 
-            // x axis
             let text_area = glyphon::TextArea {
-                buffer: &self.text_buffer,
-                left: if instance.position.x == 0.0 { center_width } else { x - position_offset },
-                top:  center_height - bound_offset,
+                buffer: &self.x_text_buffer,
+                left: if instance.position.x == 0.0 { axis_pos.x } else { text_pos.x - position_offset },
+                top:  axis_pos.y - bound_offset,
                 scale: 1.0,
                 bounds: glyphon::TextBounds {
-                    left: (x - position_offset) as i32,
-                    top: center_height as i32,
+                    left: (text_pos.x - position_offset) as i32,
+                    top: axis_pos.y as i32,
                     right: size.width as i32,
-                    bottom: (center_height + self.text_size) as i32,
+                    bottom: (axis_pos.y + self.text_size) as i32,
                 },
                 default_color: glyphon::Color::rgb(0, 0, 0),
             };
             text_areas.push(text_area);
+        }
+        for (i, instance) in horizontal_instances.iter().enumerate() {
+            let text_pos = camera.world_to_screen_space(instance.position, size);
 
-            // y axis
+            let bound_offset = i as f32 * self.spacing;
+
             let text_area = glyphon::TextArea {
-                buffer: &self.text_buffer,
-                left: center_width,
-                top: y - bound_offset - position_offset,
+                buffer: &self.y_text_buffer,
+                left: axis_pos.x,
+                top: text_pos.y - bound_offset - position_offset,
                 scale: 1.0,
                 bounds: glyphon::TextBounds {
-                    left: center_width as i32,
-                    top: (y - position_offset) as i32,
+                    left: axis_pos.x as i32,
+                    top: (text_pos.y - position_offset) as i32,
                     right: size.width as i32,
-                    bottom: (y + self.text_size - position_offset) as i32,
+                    bottom: (text_pos.y + self.text_size - position_offset) as i32,
                 },
                 default_color: glyphon::Color::rgb(0, 0, 0),
             };
-            
+
             // avoid doubling up the origin label
             if instance.position.y != 0.0 {
                 text_areas.push(text_area);
@@ -162,7 +193,12 @@ impl Text {
         let physical_width = new_size.width as f32 * 2.0;
         let physical_height = new_size.height as f32 * 2.0;
 
-        self.text_buffer.set_size(
+        self.x_text_buffer.set_size(
+            &mut self.font_system,
+            Some(physical_width),
+            Some(physical_height),
+        );
+        self.y_text_buffer.set_size(
             &mut self.font_system,
             Some(physical_width),
             Some(physical_height),
@@ -174,8 +210,10 @@ pub struct Grid {
     pub render_pipeline: wgpu::RenderPipeline,
     pub horizontal_buffer: wgpu::Buffer,
     pub vertical_buffer: wgpu::Buffer,
-    pub instance_buffer: wgpu::Buffer,
-    pub instances: Vec<Instance>,
+    pub vertical_instance_buffer: wgpu::Buffer,
+    pub horizontal_instance_buffer: wgpu::Buffer,
+    pub vertical_instances: Vec<Instance>,
+    pub horizontal_instances: Vec<Instance>,
 }
 
 impl Grid {
@@ -237,7 +275,8 @@ impl Grid {
                 mapped_at_creation: false,
             }
         );
-        let instance_buffer = device.create_buffer(
+
+        let vertical_instance_buffer = device.create_buffer(
             &wgpu::BufferDescriptor {
                 label: Some("Grid Instance Buffer"),
                 size: 6400,
@@ -246,19 +285,32 @@ impl Grid {
             }
         );
 
-        let instances = vec![];
+        let horizontal_instance_buffer = device.create_buffer(
+            &wgpu::BufferDescriptor {
+                label: Some("Grid Instance Buffer"),
+                size: 6400,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            }
+        );
+
+        let horizontal_instances = vec![];
+        let vertical_instances = vec![];
 
         Self {
             render_pipeline,
             horizontal_buffer,
             vertical_buffer,
-            instance_buffer,
-            instances,
+            vertical_instance_buffer,
+            horizontal_instance_buffer,
+            horizontal_instances,
+            vertical_instances,
         }
     }
     
     pub fn update_grid(&mut self, queue: &wgpu::Queue, camera: &camera::Camera) {
-        self.instances = get_instances(camera);
+        self.vertical_instances = get_instances(camera, true);
+        self.horizontal_instances = get_instances(camera, false);
         self.set_buffers(queue, camera.eye.z);
     }
 
@@ -275,10 +327,12 @@ impl Grid {
             Vertex { position: [0.0, -line_limit, 0.0] },
         ];
 
-        let instance_data = self.instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
+        let vertical_instance_data = self.vertical_instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
+        let horizontal_instance_data = self.horizontal_instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
 
         queue.write_buffer(&self.horizontal_buffer, 0, bytemuck::cast_slice(&line_horizontal));
         queue.write_buffer(&self.vertical_buffer, 0, bytemuck::cast_slice(&line_vertical));
-        queue.write_buffer(&self.instance_buffer, 0, bytemuck::cast_slice(&instance_data));
+        queue.write_buffer(&self.horizontal_instance_buffer, 0, bytemuck::cast_slice(&horizontal_instance_data));
+        queue.write_buffer(&self.vertical_instance_buffer, 0, bytemuck::cast_slice(&vertical_instance_data));
     }
 }

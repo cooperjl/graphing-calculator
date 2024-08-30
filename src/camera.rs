@@ -64,8 +64,8 @@ impl CameraUniform {
 
 pub struct CameraController {
     speed: f32,
-    is_forward_pressed: bool,
-    is_backward_pressed: bool,
+    is_up_pressed: bool,
+    is_down_pressed: bool,
     is_left_pressed: bool,
     is_right_pressed: bool,
     scroll: f32,
@@ -75,8 +75,8 @@ impl CameraController {
     pub fn new(speed: f32) -> Self {
         Self {
             speed,
-            is_forward_pressed: false,
-            is_backward_pressed: false,
+            is_up_pressed: false,
+            is_down_pressed: false,
             is_left_pressed: false,
             is_right_pressed: false,
             scroll: 0.0,
@@ -97,11 +97,11 @@ impl CameraController {
                 let is_pressed = *state == ElementState::Pressed;
                 match keycode {
                     KeyCode::KeyW | KeyCode::ArrowUp => {
-                        self.is_forward_pressed = is_pressed;
+                        self.is_up_pressed = is_pressed;
                         true
                     }
                     KeyCode::KeyS | KeyCode::ArrowDown => {
-                        self.is_backward_pressed = is_pressed;
+                        self.is_down_pressed = is_pressed;
                         true
                     }
                     KeyCode::KeyA | KeyCode::ArrowLeft => {
@@ -148,9 +148,21 @@ impl CameraController {
             camera.eye += change;
             self.scroll = 0.0;
         }
-        if self.is_forward_pressed && forward_mag > self.speed {
+        if self.is_up_pressed {
+            camera.eye.y += 0.01 * camera.eye.z;
+            camera.target.y += 0.01 * camera.eye.z;
         }
-        if self.is_backward_pressed {
+        if self.is_down_pressed {
+            camera.eye.y -= 0.01 * camera.eye.z;
+            camera.target.y -= 0.01 * camera.eye.z;
+        }
+        if self.is_left_pressed {
+            camera.eye.x -= 0.01 * camera.eye.z;
+            camera.target.x -= 0.01 * camera.eye.z;
+        }
+        if self.is_right_pressed {
+            camera.eye.x += 0.01 * camera.eye.z;
+            camera.target.x += 0.01 * camera.eye.z;
         }
     }
 }
