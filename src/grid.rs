@@ -176,11 +176,15 @@ impl Text {
                 },
                 default_color: glyphon::Color::rgb(0, 0, 0),
             };
+            text_areas.push(text_area);
 
             // avoid doubling up the origin label
+            // origin label disabled so code disabled, remove above text_areas.push if using
+            /*
             if instance.position.y != 0.0 {
                 text_areas.push(text_area);
             }
+            */
         }
 
         self.text_renderer.prepare(
@@ -340,5 +344,76 @@ impl Grid {
         queue.write_buffer(&self.vertical_buffer, 0, bytemuck::cast_slice(&line_vertical));
         queue.write_buffer(&self.horizontal_instance_buffer, 0, bytemuck::cast_slice(&horizontal_instance_data));
         queue.write_buffer(&self.vertical_instance_buffer, 0, bytemuck::cast_slice(&vertical_instance_data));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_vertical() {
+        let x = 5.0;
+        let y = 200.0;
+        let camera = camera::Camera {
+            eye: (x, y, 4.0).into(),
+            target: (x, y, 0.0).into(),
+            up: cgmath::Vector3::unit_y(),
+            aspect: 1.0,
+            fovy: 45.0,
+            znear: 0.1,
+            zfar: 100.0,
+        };
+
+        let v_instances = get_instances(&camera, true);
+        let h_instances = get_instances(&camera, false);
+
+        for (v_instance, h_instance) in v_instances.iter().zip(h_instances.iter()) {
+            // they will share a common point in the center
+            if v_instance.position.x != x && v_instance.position.y != y {
+                // assert the positions are different as they should be here if vertical functions
+                assert_ne!(v_instance.position, h_instance.position);
+            }
+        }
+    }
+
+    #[test]
+    fn next_zoom_level_is_double() {
+        // using a zoom level of 20 for testing purposes
+        let zoom_level = 20_u32.next_power_of_two() as f32;
+        let camera1 = camera::Camera {
+            eye: (0.0, 0.0, zoom_level).into(),
+            target: (0.0, 0.0, 0.0).into(),
+            up: cgmath::Vector3::unit_y(),
+            aspect: 1.0,
+            fovy: 45.0,
+            znear: 0.1,
+            zfar: 100.0,
+        };
+        let camera2 = camera::Camera {
+            eye: (0.0, 0.0, zoom_level * 2.0).into(),
+            target: (0.0, 0.0, 0.0).into(),
+            up: cgmath::Vector3::unit_y(),
+            aspect: 1.0,
+            fovy: 45.0,
+            znear: 0.1,
+            zfar: 100.0,
+        };
+
+        // for vertical / x
+        let instances1 = get_instances(&camera1, true);
+        let instances2 = get_instances(&camera2, true);
+
+        for (instance1, instance2) in instances1.iter().zip(instances2.iter()) {
+            assert_eq!(instance1.position.x * 2.0, instance2.position.x);
+        }
+
+        // for horizontal / y
+        let instances1 = get_instances(&camera1, false);
+        let instances2 = get_instances(&camera2, false);
+
+        for (instance1, instance2) in instances1.iter().zip(instances2.iter()) {
+            assert_eq!(instance1.position.y * 2.0, instance2.position.y);
+        }
     }
 }

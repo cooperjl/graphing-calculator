@@ -28,7 +28,7 @@ pub struct Color<T> {
     pub a: T,
 }
 
-impl<T: cgmath::BaseNum> Color<T> {
+impl<T: Copy> Color<T> {
     pub fn to_raw(&self) -> [T; 4] {
         [self.r, self.g, self.b, self.a]
     }

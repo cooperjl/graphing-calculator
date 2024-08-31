@@ -161,3 +161,26 @@ impl PointPipeline {
         queue.write_buffer(&self.index_buffer, 0, bytemuck::cast_slice(&circle.indices));
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use approx::relative_eq;
+
+    #[test]
+    fn are_circle_vertices_on_circle() {
+        let radius = 1.0;
+        let circle = Circle::new(radius, 32);
+
+        for vertex in circle.vertices {
+            if vertex.position != [0.0, 0.0, 0.0] {
+                let x_squared = vertex.position[0].powf(2.0);
+                let y_squared = vertex.position[1].powf(2.0);
+                let r_squared = radius.powf(2.0);
+                
+                assert!(relative_eq!(x_squared + y_squared, r_squared));
+            }
+        }
+    }
+}
