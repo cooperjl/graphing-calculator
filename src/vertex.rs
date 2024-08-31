@@ -21,10 +21,23 @@ impl Vertex {
     }
 }
 
+pub struct Color<T> {
+    pub r: T,
+    pub g: T,
+    pub b: T,
+    pub a: T,
+}
+
+impl<T: cgmath::BaseNum> Color<T> {
+    pub fn to_raw(&self) -> [T; 4] {
+        [self.r, self.g, self.b, self.a]
+    }
+}
+
 pub struct Instance {
     pub position: cgmath::Vector3<f32>,
     pub rotation: cgmath::Quaternion<f32>,
-    pub color: [f32; 4],
+    pub color: Color<f32>,
 }
 
 #[repr(C)]
@@ -38,7 +51,7 @@ impl Instance {
     pub fn to_raw(&self) -> InstanceRaw {
         InstanceRaw {
             model: (cgmath::Matrix4::from_translation(self.position) * cgmath::Matrix4::from(self.rotation)).into(),
-            color: self.color,
+            color: self.color.to_raw(),
         }
     }
 }

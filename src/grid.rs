@@ -1,7 +1,7 @@
 use wgpu::{self, include_wgsl};
 use cgmath::prelude::*;
 
-use crate::vertex::{Vertex, Instance, InstanceRaw};
+use crate::vertex::{Vertex, Color, Instance, InstanceRaw};
 use crate::camera;
 
 fn get_instances(camera: &camera::Camera, vertical: bool) -> Vec<Instance> {
@@ -10,19 +10,25 @@ fn get_instances(camera: &camera::Camera, vertical: bool) -> Vec<Instance> {
 
     let mut instances: Vec<Instance> = vec![];
 
-    let bound_l = (base_spacing * -1.5) as i32;
-    let bound_r = (base_spacing * 1.5) as i32;
+    let offset = if vertical {
+        camera.eye.x * sf
+    } else {
+        camera.eye.y * sf
+    } as i32;
+
+    let bound_l = (base_spacing * -1.5) as i32 + offset;
+    let bound_r = (base_spacing * 1.5) as i32 + offset;
 
     for i in bound_l..bound_r {
         let x = if vertical {
             i as f32 / sf
         } else {
-            0.0
+            camera.eye.x
         };
         let y = if !vertical {
             i as f32 / sf
         } else {
-            0.0
+            camera.eye.y
         };
         let position = cgmath::Vector3 { x, y, z: 0.0 };
         let rotation = if position.is_zero() {
@@ -37,7 +43,7 @@ fn get_instances(camera: &camera::Camera, vertical: bool) -> Vec<Instance> {
             _ => 0.4,
         };
 
-        let color = [0.0, 0.0, 0.0, a];
+        let color = Color { r: 0.0, g: 0.0, b: 0.0, a };
 
         instances.push(Instance {
             position,
@@ -106,17 +112,17 @@ impl Text {
     }
     pub fn prepare(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, size: winit::dpi::PhysicalSize<u32>, camera: &camera::Camera, vertical_instances: &Vec<Instance>, horizontal_instances: &Vec<Instance>) {
         let mut y_text: String = "".to_owned();
-        for (i, instance) in horizontal_instances.iter().enumerate() {
+        for instance in horizontal_instances {
             let num = instance.position.y as f32;
-            if i % 5 == 0 {
+            if instance.color.a == 0.7 {
                 y_text.push_str(format!("{num}").as_str());
             } 
             y_text.push_str("\n");
         }
         let mut x_text: String = "".to_owned();
-        for (i, instance) in vertical_instances.iter().enumerate() {
+        for instance in vertical_instances {
             let num = instance.position.x as f32;
-            if i % 5 == 0 {
+            if instance.color.a == 0.7 {
                 x_text.push_str(format!("{num}").as_str());
             } 
             x_text.push_str("\n");

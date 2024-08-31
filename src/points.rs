@@ -1,7 +1,7 @@
 use wgpu::{self, include_wgsl, util::DeviceExt};
 use cgmath::prelude::*;
 
-use crate::vertex::{Vertex, Instance, InstanceRaw};
+use crate::vertex::{Color, Instance, InstanceRaw, Vertex};
 use crate::camera;
 
 pub struct Circle {
@@ -126,7 +126,7 @@ impl PointPipeline {
             cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(0.0))
         };
 
-        let color = [0.0, 0.0, 1.0, 1.0];
+        let color = Color { r: 0.0, g: 0.0, b: 1.0, a: 1.0 };
 
         instances.push(Instance {
             position,
