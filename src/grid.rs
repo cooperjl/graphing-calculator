@@ -70,8 +70,8 @@ impl Text {
     pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, format: wgpu::TextureFormat, size: winit::dpi::PhysicalSize<u32>) -> Self {
         let mut font_system = glyphon::FontSystem::new();
         let swash_cache = glyphon::SwashCache::new();
-        let cache = glyphon::Cache::new(&device);
-        let viewport = glyphon::Viewport::new(&device, &cache);
+        let cache = glyphon::Cache::new(device);
+        let viewport = glyphon::Viewport::new(device, &cache);
 
         let mut atlas = glyphon::TextAtlas::new(device, queue, &cache, format);
         let text_renderer = glyphon::TextRenderer::new(&mut atlas, device, wgpu::MultisampleState::default(), None);
@@ -113,19 +113,19 @@ impl Text {
     pub fn prepare(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, size: winit::dpi::PhysicalSize<u32>, camera: &camera::Camera, vertical_instances: &Vec<Instance>, horizontal_instances: &Vec<Instance>) {
         let mut y_text: String = "".to_owned();
         for instance in horizontal_instances {
-            let num = instance.position.y as f32;
+            let num = instance.position.y;
             if instance.color.a == 0.7 {
                 y_text.push_str(format!("{num}").as_str());
             } 
-            y_text.push_str("\n");
+            y_text.push('\n');
         }
         let mut x_text: String = "".to_owned();
         for instance in vertical_instances {
-            let num = instance.position.x as f32;
+            let num = instance.position.x;
             if instance.color.a == 0.7 {
                 x_text.push_str(format!("{num}").as_str());
             } 
-            x_text.push_str("\n");
+            x_text.push('\n');
         }
 
         let attrs = glyphon::Attrs::new()
@@ -340,8 +340,8 @@ impl Grid {
         let vertical_instance_data = self.vertical_instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
         let horizontal_instance_data = self.horizontal_instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
 
-        queue.write_buffer(&self.horizontal_buffer, 0, bytemuck::cast_slice(&line_horizontal));
-        queue.write_buffer(&self.vertical_buffer, 0, bytemuck::cast_slice(&line_vertical));
+        queue.write_buffer(&self.horizontal_buffer, 0, bytemuck::cast_slice(line_horizontal));
+        queue.write_buffer(&self.vertical_buffer, 0, bytemuck::cast_slice(line_vertical));
         queue.write_buffer(&self.horizontal_instance_buffer, 0, bytemuck::cast_slice(&horizontal_instance_data));
         queue.write_buffer(&self.vertical_instance_buffer, 0, bytemuck::cast_slice(&vertical_instance_data));
     }

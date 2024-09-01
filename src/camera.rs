@@ -1,3 +1,4 @@
+use winit::dpi::{PhysicalPosition, PhysicalSize};
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::event::{ElementState, KeyEvent, MouseScrollDelta, WindowEvent};
 
@@ -10,14 +11,18 @@ pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
 );
 
 
-fn calculate_screen_space(pos: cgmath::Vector4<f32>, size: winit::dpi::PhysicalSize<u32>) -> cgmath::Vector2<f32> {
+fn calculate_screen_space(pos: cgmath::Vector4<f32>, size: PhysicalSize<u32>) -> cgmath::Vector2<f32> {
     let x = (size.width as f32 * ((pos.x / pos.w) + 1.0)) / 2.0;
     let y = (size.height as f32 * ((pos.y / pos.w) - 1.0)) / -2.0;
 
-    cgmath::Vector2 {
-        x,
-        y,
-    }
+    cgmath::Vector2 { x, y }
+}
+
+fn normalise_screen_space(pos: PhysicalPosition<f32>, size: PhysicalSize<u32>) -> cgmath::Vector2<f32> {
+    let x = ((2.0 / size.width as f32) * pos.x) - 1.0;
+    let y = ((-2.0 / size.height as f32) * pos.y) + 1.0;
+        
+    cgmath::Vector2 { x, y }
 }
 
 pub struct Camera {
@@ -35,17 +40,15 @@ impl Camera {
         let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up);
         let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
         
-        return OPENGL_TO_WGPU_MATRIX * proj * view;
+        OPENGL_TO_WGPU_MATRIX * proj * view
     }
 
-    pub fn world_to_screen_space(&self, pos: cgmath::Vector3<f32>, size: winit::dpi::PhysicalSize<u32>) -> cgmath::Vector2<f32> {
+    pub fn world_to_screen_space(&self, pos: cgmath::Vector3<f32>, size: PhysicalSize<u32>) -> cgmath::Vector2<f32> {
         // convert from world space to camera space
         let pos = self.build_view_projection_matrix() * cgmath::vec4(pos.x, pos.y, pos.z, 1.0);
         // convert from camera space to screen space
         calculate_screen_space(pos, size)
-        
     }
-
 }
 
 #[repr(C)]
@@ -69,6 +72,7 @@ impl CameraUniform {
 
 pub struct CameraController {
     speed: f32,
+    cursor_location: PhysicalPosition<f32>,
     is_up_pressed: bool,
     is_down_pressed: bool,
     is_left_pressed: bool,
@@ -80,6 +84,7 @@ impl CameraController {
     pub fn new(speed: f32) -> Self {
         Self {
             speed,
+            cursor_location: PhysicalPosition { x: 0.0, y: 0.0 },
             is_up_pressed: false,
             is_down_pressed: false,
             is_left_pressed: false,
@@ -121,22 +126,25 @@ impl CameraController {
                 }
             },
             WindowEvent::MouseWheel {
-                delta,
+                delta: MouseScrollDelta::LineDelta(_x, y),
                 ..
             } => {
-                match delta {
-                    MouseScrollDelta::LineDelta(_x, y) => {
-                        self.scroll = *y;
-                        true
-                    }
-                    _ => false,
-                }
+                self.scroll = *y;
+                true
+            },
+            WindowEvent::CursorMoved {
+                position,
+                ..
+            } => {
+                self.cursor_location.x = position.x as f32;
+                self.cursor_location.y = position.y as f32;
+                true
             },
             _ => false,
         }
     }
 
-    pub fn update_camera(&mut self, camera: &mut Camera) {
+    pub fn update_camera(&mut self, camera: &mut Camera, _size: PhysicalSize<u32>) {
         use cgmath::InnerSpace;
         let forward = camera.target - camera.eye;
         let forward_norm = forward.normalize();
@@ -178,15 +186,29 @@ mod tests {
 
     #[test]
     fn test_calculate_screen_space() {
-        let size = winit::dpi::PhysicalSize::new(256 as u32, 256 as u32);
+        let size = PhysicalSize::new(256, 256);
         
-        let pos0 = cgmath::Vector4 { x: 0.0, y: 0.0, z: 0.0, w: 1.0 };
-        assert_eq!(calculate_screen_space(pos0, size), cgmath::vec2(128.0, 128.0));
+        let pos = cgmath::Vector4 { x: 0.0, y: 0.0, z: 0.0, w: 1.0 };
+        assert_eq!(calculate_screen_space(pos, size), cgmath::vec2(128.0, 128.0));
 
-        let pos1 = cgmath::Vector4 { x: 1.0, y: -1.0, z: 0.0, w: 1.0 };
-        assert_eq!(calculate_screen_space(pos1, size), cgmath::vec2(256.0, 256.0));
+        let pos = cgmath::Vector4 { x: 1.0, y: -1.0, z: 0.0, w: 1.0 };
+        assert_eq!(calculate_screen_space(pos, size), cgmath::vec2(256.0, 256.0));
 
-        let pos2 = cgmath::Vector4 { x: -1.0, y: 1.0, z: 0.0, w: 1.0 };
-        assert_eq!(calculate_screen_space(pos2, size), cgmath::vec2(0.0, 0.0));
+        let pos = cgmath::Vector4 { x: -1.0, y: 1.0, z: 0.0, w: 1.0 };
+        assert_eq!(calculate_screen_space(pos, size), cgmath::vec2(0.0, 0.0));
+    }
+
+    #[test]
+    fn test_normalise_screen_space() {
+        let size = PhysicalSize::new(256, 256);
+        
+        let pos = PhysicalPosition::new(256.0, 256.0);
+        assert_eq!(normalise_screen_space(pos, size), cgmath::vec2(1.0, -1.0));
+
+        let pos = PhysicalPosition::new(128.0, 128.0);
+        assert_eq!(normalise_screen_space(pos, size), cgmath::vec2(0.0, 0.0));
+
+        let pos = PhysicalPosition::new(0.0, 0.0);
+        assert_eq!(normalise_screen_space(pos, size), cgmath::vec2(-1.0, 1.0));
     }
 }
