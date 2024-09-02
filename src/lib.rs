@@ -159,6 +159,11 @@ impl<'a> State<'a> {
             self.config.height = new_size.height;
             self.surface.configure(&self.device, &self.config);
             self.grid_text.resize(new_size);
+
+            let new_aspect = new_size.width as f32 / new_size.height as f32;
+            if new_aspect <= 3.0 {
+                self.camera.aspect = new_aspect;
+            }
         }
     }
 

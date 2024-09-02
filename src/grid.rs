@@ -5,7 +5,7 @@ use crate::vertex::{Vertex, Color, Instance, InstanceRaw};
 use crate::camera;
 
 fn get_instances(camera: &camera::Camera, vertical: bool) -> Vec<Instance> {
-    let base_spacing = 20.0;
+    let base_spacing = 40.0;
     let sf = base_spacing / (camera.eye.z as u32).next_power_of_two() as f32;
 
     let mut instances: Vec<Instance> = vec![];
@@ -15,9 +15,9 @@ fn get_instances(camera: &camera::Camera, vertical: bool) -> Vec<Instance> {
     } else {
         camera.eye.y * sf
     } as i32;
-
-    let bound_l = (base_spacing * -1.5) as i32 + offset;
-    let bound_r = (base_spacing * 1.5) as i32 + offset;
+    
+    let bound_l = (base_spacing * -2.0) as i32 + offset;
+    let bound_r = (base_spacing * 2.0) as i32 + offset;
 
     for i in bound_l..bound_r {
         let x = if vertical {
@@ -200,17 +200,17 @@ impl Text {
     }
 
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
-        let physical_width = new_size.width as f32 * 2.0;
-        let physical_height = new_size.height as f32 * 2.0;
+        let physical_width = new_size.width as f32 * 4.0;
+        let physical_height = new_size.height as f32 * 4.0;
 
         self.x_text_buffer.set_size(
             &mut self.font_system,
             Some(physical_width),
-            Some(physical_height),
+            Some(physical_width),
         );
         self.y_text_buffer.set_size(
             &mut self.font_system,
-            Some(physical_width),
+            Some(physical_height),
             Some(physical_height),
         );
     }
@@ -289,7 +289,7 @@ impl Grid {
         let vertical_instance_buffer = device.create_buffer(
             &wgpu::BufferDescriptor {
                 label: Some("Grid Instance Buffer"),
-                size: 6400,
+                size: 12800,
                 usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             }
@@ -298,7 +298,7 @@ impl Grid {
         let horizontal_instance_buffer = device.create_buffer(
             &wgpu::BufferDescriptor {
                 label: Some("Grid Instance Buffer"),
-                size: 6400,
+                size: 12800,
                 usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
                 mapped_at_creation: false,
             }
@@ -325,7 +325,7 @@ impl Grid {
     }
 
     fn set_buffers(&self, queue: &wgpu::Queue, sf: f32) {
-        let line_limit = sf * 1.5;
+        let line_limit = sf * 2.0;
 
         let line_horizontal: &[Vertex] = &[
             Vertex { position: [-line_limit, 0.0, 0.0] },
