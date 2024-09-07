@@ -2,12 +2,13 @@ use winit::{
     event::*, event_loop::EventLoop, window::{Window, WindowBuilder}
 };
 
-use wgpu::{self, util::DeviceExt};
+use wgpu::{self, util::{DeviceExt}};
 
 mod vertex;
 mod camera;
-mod points;
 mod grid;
+mod points;
+mod eqn;
 
 struct State<'a> {
     surface: wgpu::Surface<'a>,
@@ -24,6 +25,7 @@ struct State<'a> {
     grid: grid::Grid,
     grid_text: grid::Text,
     point_pipeline: points::PointPipeline,
+    equations: eqn::Equation,
 }
 
 impl<'a> State<'a> {
@@ -130,6 +132,8 @@ impl<'a> State<'a> {
         let grid = grid::Grid::new(&device, &render_pipeline_layout, &config);
         let grid_text = grid::Text::new(&device, &queue, surface_format, size);
 
+        let equations = eqn::Equation::new(&device, &render_pipeline_layout, &config);
+
         Self {
             surface,
             device,
@@ -145,6 +149,7 @@ impl<'a> State<'a> {
             grid,
             grid_text,
             point_pipeline,
+            equations,
         }
     }
 
@@ -178,6 +183,7 @@ impl<'a> State<'a> {
         self.grid.update_grid(&self.queue, &self.camera);
         self.point_pipeline.update_points(&self.queue, &self.camera);
         self.grid_text.viewport.update(&self.queue, glyphon::Resolution { width: self.config.width, height: self.config.height });
+        self.equations.update_equations(&self.queue, &self.camera);
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -214,6 +220,12 @@ impl<'a> State<'a> {
         render_pass.set_vertex_buffer(0, self.grid.horizontal_buffer.slice(..));
         render_pass.set_vertex_buffer(1, self.grid.horizontal_instance_buffer.slice(..));
         render_pass.draw(0..2, 0..self.grid.horizontal_instances.len() as _);
+        // equation rendering
+        render_pass.set_pipeline(&self.equations.render_pipeline);
+        render_pass.set_vertex_buffer(0, self.equations.vertex_buffer.slice(..));
+        render_pass.set_vertex_buffer(1, self.equations.instance_buffer.slice(..));
+        render_pass.set_index_buffer(self.equations.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+        render_pass.draw_indexed(0..self.equations.num_indices, 0, 0..self.equations.instances.len() as _);
         // point rendering
         render_pass.set_pipeline(&self.point_pipeline.render_pipeline);
         render_pass.set_vertex_buffer(0, self.point_pipeline.vertex_buffer.slice(..));

@@ -12,8 +12,8 @@ pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
 
 
 fn calculate_screen_space(pos: cgmath::Vector2<f32>, size: PhysicalSize<u32>) -> cgmath::Vector2<f32> {
-    let x = (size.width as f32 * ((pos.x) + 1.0)) / 2.0;
-    let y = (size.height as f32 * ((pos.y) - 1.0)) / -2.0;
+    let x = (size.width as f32 * (pos.x + 1.0)) / 2.0;
+    let y = (size.height as f32 * (pos.y - 1.0)) / -2.0;
 
     cgmath::Vector2 { x, y }
 }

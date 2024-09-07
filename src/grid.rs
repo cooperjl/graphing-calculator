@@ -8,7 +8,7 @@ fn get_instances(camera: &camera::Camera, vertical: bool) -> Vec<Instance> {
     let base_spacing = 40.0;
     let sf = base_spacing / (camera.eye.z as u32).next_power_of_two() as f32;
 
-    let mut instances: Vec<Instance> = vec![];
+    let mut instances: Vec<Instance> = Vec::new();
 
     let offset = if vertical {
         camera.eye.x * sf
