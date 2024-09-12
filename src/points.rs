@@ -96,7 +96,7 @@ impl PointPipeline {
         });
 
 
-        let circle = Circle::new(0.01, 32);
+        let circle = Circle::new(0.005, 32);
 
         let vertex_buffer = device.create_buffer_init(
             &wgpu::util::BufferInitDescriptor {
@@ -116,32 +116,17 @@ impl PointPipeline {
 
         let num_indices = circle.segments * 6;
 
-        let mut instances = vec![];
-
-        let position = cgmath::Vector3 { x: 1.0, y: 1.0, z: 0.0 };
-
-        let rotation = if position.is_zero() {
-            cgmath::Quaternion::from_axis_angle(cgmath::Vector3::unit_z(), cgmath::Deg(0.0))
-        } else {
-            cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(0.0))
-        };
-
-        let color = Color { r: 0.0, g: 0.0, b: 1.0, a: 1.0 };
-
-        instances.push(Instance {
-            position,
-            rotation,
-            color,
-        });
-
-        let instance_data = instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
-        let instance_buffer = device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("Instance Buffer"),
-                contents: bytemuck::cast_slice(&instance_data),
-                usage: wgpu::BufferUsages::VERTEX,
+        let instances: Vec<Instance> = Vec::new();
+        
+        let instance_buffer = device.create_buffer(
+            &wgpu::BufferDescriptor {
+                label: Some("Points Instance Buffer"),
+                size: 100000,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
             }
         );
+
 
         Self {
             render_pipeline,
@@ -159,6 +144,28 @@ impl PointPipeline {
 
         queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&circle.vertices));
         queue.write_buffer(&self.index_buffer, 0, bytemuck::cast_slice(&circle.indices));
+    }
+
+    pub fn put_points(&mut self, queue: &wgpu::Queue, points: &Vec<Vertex>) {
+        for point in points {
+            //let position = point.position;
+            let position = cgmath::Vector3 { x: point.position[0], y: point.position[1], z: 0.0 };
+            let rotation = if position.is_zero() {
+                cgmath::Quaternion::from_axis_angle(cgmath::Vector3::unit_z(), cgmath::Deg(0.0))
+            } else {
+                cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(0.0))
+            };
+            let color = Color { r: 0.0, g: 1.0, b: 0.0, a: 1.0 };
+
+            self.instances.push(Instance {
+                position,
+                rotation,
+                color,
+            });
+        }
+
+        let instance_data = &self.instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
+        queue.write_buffer(&self.instance_buffer, 0, bytemuck::cast_slice(instance_data));
     }
 }
 

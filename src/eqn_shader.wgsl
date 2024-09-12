@@ -42,11 +42,5 @@ fn vs_main(
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-  var a = 0.0;
-
-  if abs(in.model_position.x - in.model_position.y) <= 0.01 {
-    a = 1.0;
-  }
-
-  return vec4<f32>(in.color.xyz, a);
+  return vec4<f32>(in.color);
 }
