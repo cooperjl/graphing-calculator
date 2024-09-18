@@ -155,6 +155,7 @@ impl Text {
                     bottom: (axis_pos.y + self.text_size) as i32,
                 },
                 default_color: glyphon::Color::rgb(0, 0, 0),
+                custom_glyphs: &[],
             };
             text_areas.push(text_area);
         }
@@ -175,6 +176,7 @@ impl Text {
                     bottom: (text_pos.y + self.text_size - position_offset) as i32,
                 },
                 default_color: glyphon::Color::rgb(0, 0, 0),
+                custom_glyphs: &[],
             };
             text_areas.push(text_area);
 
