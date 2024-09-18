@@ -91,7 +91,7 @@ impl<'a> State<'a> {
             }
         );
 
-        let camera_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries:  &[
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
@@ -104,18 +104,18 @@ impl<'a> State<'a> {
                     count: None,
                 }
             ],
-            label: Some("camera_bind_group_layout"),
+            label: Some("Bind Group Layout"),
         });
 
         let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &camera_bind_group_layout,
+            layout: &bind_group_layout,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
                     resource: camera_buffer.as_entire_binding(),
                 }
             ],
-            label: Some("camera_bind_group"),
+            label: Some("Camera Bind Group"),
         });
 
         let camera_controller = camera::CameraController::new(0.1);
@@ -123,19 +123,27 @@ impl<'a> State<'a> {
         let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Render Pipeline Layout"),
             bind_group_layouts: &[
-                &camera_bind_group_layout,
+                &bind_group_layout,
             ],
             push_constant_ranges: &[],
         });
 
-        let mut point_pipeline = points::PointPipeline::new(&device, &render_pipeline_layout, &config);
+        let color_render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Render Pipeline Layout"),
+            bind_group_layouts: &[
+                &bind_group_layout,
+                &bind_group_layout,
+            ],
+            push_constant_ranges: &[],
+        });
+
+        let point_pipeline = points::PointPipeline::new(&device, &render_pipeline_layout, &config);
         let grid = grid::Grid::new(&device, &render_pipeline_layout, &config);
         let grid_text = grid::Text::new(&device, &queue, surface_format, size);
 
-        let mut equations = eqn::Equation::new(&device, &render_pipeline_layout, config.format);
-        equations.make_cubic();
-        point_pipeline.put_points(&queue, &equations.vertices);
-
+        let mut equations = eqn::Equation::new(&device, &color_render_pipeline_layout, &bind_group_layout, config.format);
+        equations.update_equations(&queue, &camera);
+        //point_pipeline.put_points(&queue, &equations.vertices);
 
         Self {
             surface,
@@ -176,7 +184,9 @@ impl<'a> State<'a> {
     }
 
     fn input(&mut self, event: &WindowEvent) -> bool {
+        self.redraw();
         self.camera_controller.process_events(event)
+
     }
 
     fn update(&mut self) {
@@ -186,7 +196,10 @@ impl<'a> State<'a> {
         self.grid.update_grid(&self.queue, &self.camera);
         self.point_pipeline.update_points(&self.queue, &self.camera);
         self.grid_text.viewport.update(&self.queue, glyphon::Resolution { width: self.config.width, height: self.config.height });
-        self.equations.update_equations(&self.queue);
+    }
+
+    fn redraw(&mut self) {
+        self.equations.update_equations(&self.queue, &self.camera);
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -226,10 +239,13 @@ impl<'a> State<'a> {
             render_pass.draw(0..2, 0..self.grid.horizontal_instances.len() as _);
             // equation rendering
             render_pass.set_pipeline(&self.equations.render_pipeline);
-            render_pass.set_vertex_buffer(0, self.equations.vertex_buffer.slice(..));
-            render_pass.set_vertex_buffer(1, self.equations.instance_buffer.slice(..));
-            render_pass.set_index_buffer(self.equations.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            render_pass.draw_indexed(0..self.equations.line.indices.len() as u32, 0, 0..self.equations.instances.len() as _);
+            //render_pass.set_vertex_buffer(1, self.equations.instance_buffer.slice(..));
+            for line in &self.equations.lines {
+                render_pass.set_bind_group(1, &line.color_bind_group, &[]);
+                render_pass.set_vertex_buffer(0, line.vertex_buffer.slice(..));
+                render_pass.set_index_buffer(line.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+                render_pass.draw_indexed(0..line.indices.len() as u32, 0, 0..1);
+            }
             // point rendering
             render_pass.set_pipeline(&self.point_pipeline.render_pipeline);
             render_pass.set_vertex_buffer(0, self.point_pipeline.vertex_buffer.slice(..));
@@ -260,7 +276,6 @@ pub async fn run() {
                 ref event,
                 window_id,
             } if window_id == state.window().id() => if !state.input(event) {
-
                 match &event {
                     WindowEvent::Resized(physical_size) => state.resize(*physical_size),
                     WindowEvent::CloseRequested => elwt.exit(),

@@ -67,11 +67,10 @@ impl Camera {
 
         cgmath::Vector2 { x: pos.x * 1.5, y: pos.y * 1.5 }
     }
-
-    pub fn adjust_pan_with_cursor_position(&mut self, cursor_location: PhysicalPosition<f32>, origin: cgmath::Vector2<f32>, modifier: f32, size: PhysicalSize<u32>) {
-        // this function calculates the distance from the origin of this transformation to the
-        // cursor_location and adjusts the pan/translation in x and y axis
         
+    /// Calculates the distance from the origin of this transformation to the cursor_location and
+    /// adjusts the pan/translation in the x and y axes.
+    pub fn adjust_pan_with_cursor_position(&mut self, cursor_location: PhysicalPosition<f32>, origin: cgmath::Vector2<f32>, modifier: f32, size: PhysicalSize<u32>) {
         // calculate view space positions for the cursor and origin
         let cursor_view = self.screen_to_view_space(cgmath::vec2(cursor_location.x, cursor_location.y), size);
         let origin_view = self.screen_to_view_space(origin, size);

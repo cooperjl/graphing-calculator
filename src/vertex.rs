@@ -33,6 +33,20 @@ impl<T: Copy> Color<T> {
     }
 }
 
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct ColorUniform {
+    raw: [f32; 4],
+}
+
+impl ColorUniform {
+    pub fn new(color: Color<f32>) -> Self {
+        Self {
+            raw: color.to_raw()
+        }
+    }
+}
+
 pub struct Instance {
     pub position: cgmath::Vector3<f32>,
     pub rotation: cgmath::Quaternion<f32>,
