@@ -188,7 +188,6 @@ impl CameraController {
                         self.scroll = position.y as f32;
                         true
                     }
-                    _ => false,
                 }
             },
             WindowEvent::CursorMoved {

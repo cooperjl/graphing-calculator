@@ -9,6 +9,7 @@ mod camera;
 mod grid;
 mod points;
 mod eqn;
+mod pipeline;
 
 struct State<'a> {
     surface: wgpu::Surface<'a>,
@@ -24,8 +25,8 @@ struct State<'a> {
     camera_controller: camera::CameraController,
     grid: grid::Grid,
     grid_text: grid::Text,
-    point_pipeline: points::PointPipeline,
-    equations: eqn::Equation,
+    point_pipeline: pipeline::PointPipeline,
+    equation_pipeline: pipeline::EquationPipeline,
 }
 
 impl<'a> State<'a> {
@@ -137,13 +138,18 @@ impl<'a> State<'a> {
             push_constant_ranges: &[],
         });
 
-        let point_pipeline = points::PointPipeline::new(&device, &render_pipeline_layout, &config);
+        let point_pipeline = pipeline::PointPipeline::new(&device, &render_pipeline_layout, config.format);
         let grid = grid::Grid::new(&device, &render_pipeline_layout, &config);
         let grid_text = grid::Text::new(&device, &queue, surface_format, size);
 
-        let mut equations = eqn::Equation::new(&device, &color_render_pipeline_layout, &bind_group_layout, config.format);
-        equations.update_equations(&queue, &camera);
-        //point_pipeline.put_points(&queue, &equations.vertices);
+        let mut equation_pipeline = pipeline::EquationPipeline::new(
+            &device,
+            &color_render_pipeline_layout,
+            &bind_group_layout,
+            config.format
+        );
+        equation_pipeline.update_equations(&queue, &camera);
+        // point_pipeline.put_points(&queue, &equation_pipeline.lines[0].vertices);
 
         Self {
             surface,
@@ -160,7 +166,7 @@ impl<'a> State<'a> {
             grid,
             grid_text,
             point_pipeline,
-            equations,
+            equation_pipeline,
         }
     }
 
@@ -199,7 +205,7 @@ impl<'a> State<'a> {
     }
 
     fn redraw(&mut self) {
-        self.equations.update_equations(&self.queue, &self.camera);
+        self.equation_pipeline.update_equations(&self.queue, &self.camera);
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -238,9 +244,9 @@ impl<'a> State<'a> {
             render_pass.set_vertex_buffer(1, self.grid.horizontal_instance_buffer.slice(..));
             render_pass.draw(0..2, 0..self.grid.horizontal_instances.len() as _);
             // equation rendering
-            render_pass.set_pipeline(&self.equations.render_pipeline);
+            render_pass.set_pipeline(&self.equation_pipeline.render_pipeline);
             //render_pass.set_vertex_buffer(1, self.equations.instance_buffer.slice(..));
-            for line in &self.equations.lines {
+            for line in &self.equation_pipeline.lines {
                 render_pass.set_bind_group(1, &line.color_bind_group, &[]);
                 render_pass.set_vertex_buffer(0, line.vertex_buffer.slice(..));
                 render_pass.set_index_buffer(line.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
