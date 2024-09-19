@@ -175,11 +175,21 @@ impl CameraController {
                 }
             },
             WindowEvent::MouseWheel {
-                delta: MouseScrollDelta::LineDelta(_x, y),
+                delta,
                 ..
             } => {
-                self.scroll = *y;
-                true
+                match delta {
+                    MouseScrollDelta::LineDelta(_x, y) => {
+                        self.scroll = *y;
+                        true
+
+                    }
+                    MouseScrollDelta::PixelDelta(position) => {
+                        self.scroll = position.y as f32;
+                        true
+                    }
+                    _ => false,
+                }
             },
             WindowEvent::CursorMoved {
                 position,
