@@ -4,12 +4,17 @@ use winit::{
 
 use wgpu::{self, util::DeviceExt};
 
-mod vertex;
+mod geometry;
 mod camera;
-mod text;
-mod points;
-mod eqn;
 mod pipeline;
+mod text;
+
+pub enum EquationType {
+    Polynomial,
+    Exponential, // TODO
+    Trigonometric, // TODO
+    Circle, // TODO
+}
 
 struct State<'a> {
     surface: wgpu::Surface<'a>,

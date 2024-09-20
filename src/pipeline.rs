@@ -1,10 +1,8 @@
 use wgpu::{self, util::DeviceExt, include_wgsl};
 use cgmath::prelude::*;
 
-use crate::eqn::Line;
 use crate::camera;
-use crate::vertex::{Color, Instance, InstanceRaw, Vertex};
-use crate::points::Circle;
+use crate::geometry::{Vertex, Instance, InstanceRaw, Color, Circle, Line};
 
 fn create_render_pipeline(
     device: &wgpu::Device,

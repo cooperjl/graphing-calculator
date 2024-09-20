@@ -1,7 +1,7 @@
 use cgmath::prelude::*;
 
+use crate::geometry::Instance;
 use crate::camera;
-use crate::vertex::Instance;
 
 pub struct GridText {
     pub font_system: glyphon::FontSystem,
@@ -59,7 +59,15 @@ impl GridText {
             spacing,
         }
     }
-    pub fn prepare(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, size: winit::dpi::PhysicalSize<u32>, camera: &camera::Camera, vertical_instances: &Vec<Instance>, horizontal_instances: &Vec<Instance>) {
+
+    pub fn prepare(&mut self,
+        device: &wgpu::Device, 
+        queue: &wgpu::Queue, 
+        size: winit::dpi::PhysicalSize<u32>, 
+        camera: &camera::Camera, 
+        vertical_instances: &Vec<Instance>, 
+        horizontal_instances: &Vec<Instance>
+    ) {
         let mut y_text: String = "".to_owned();
         for instance in horizontal_instances {
             let num = instance.position.y;

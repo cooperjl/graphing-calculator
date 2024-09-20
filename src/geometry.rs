@@ -1,12 +1,150 @@
 use wgpu::{self, util::DeviceExt};
 
-use crate::vertex::{Color, ColorUniform, Vertex};
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct Vertex {
+    pub position: [f32; 3],
+}
 
-pub enum EquationType {
-    Polynomial,
-    Exponential, // TODO
-    Trigonometric, // TODO
-    Circle, // TODO
+impl Vertex {
+    pub fn desc() -> wgpu::VertexBufferLayout<'static> {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 0,
+                    format: wgpu::VertexFormat::Float32x3,
+                },
+            ]
+        }
+    }
+}
+
+pub struct Color<T> {
+    pub r: T,
+    pub g: T,
+    pub b: T,
+    pub a: T,
+}
+
+impl<T: Copy> Color<T> {
+    pub fn to_raw(&self) -> [T; 4] {
+        [self.r, self.g, self.b, self.a]
+    }
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct ColorUniform {
+    raw: [f32; 4],
+}
+
+impl ColorUniform {
+    pub fn new(color: Color<f32>) -> Self {
+        Self {
+            raw: color.to_raw()
+        }
+    }
+}
+
+pub struct Instance {
+    pub position: cgmath::Vector3<f32>,
+    pub rotation: cgmath::Quaternion<f32>,
+    pub color: Color<f32>,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct InstanceRaw {
+    pub model: [[f32; 4]; 4],
+    pub color: [f32; 4],
+}
+
+impl Instance {
+    pub fn to_raw(&self) -> InstanceRaw {
+        InstanceRaw {
+            model: (cgmath::Matrix4::from_translation(self.position) * cgmath::Matrix4::from(self.rotation)).into(),
+            color: self.color.to_raw(),
+        }
+    }
+}
+
+impl InstanceRaw {
+    pub fn desc() -> wgpu::VertexBufferLayout<'static> {
+        use std::mem;
+        wgpu::VertexBufferLayout {
+            array_stride: mem::size_of::<InstanceRaw>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 5,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
+                    shader_location: 6,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 8]>() as wgpu::BufferAddress,
+                    shader_location: 7,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 12]>() as wgpu::BufferAddress,
+                    shader_location: 8,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 16]>() as wgpu::BufferAddress,
+                    shader_location: 9,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+            ],
+        }
+    }
+}
+
+pub struct Circle {
+    pub radius: f32,
+    pub segments: u32,
+    pub vertices: Vec<Vertex>,
+    pub indices: Vec<[u32; 3]>,
+}
+
+impl Circle {
+    pub fn new(radius: f32, segments: u32) -> Self {
+        let mut vertices: Vec<Vertex> = Vec::new();
+        let mut indices: Vec<[u32; 3]> = Vec::new();
+
+        vertices.push(Vertex { position: [0.0, 0.0, 0.0] });
+        indices.push([1, segments, 0]);
+
+        for s in 0..segments {
+            // trace the circle and place points along it
+            let current_seg = (2.0 * std::f32::consts::PI) * (s as f32 / segments as f32);
+
+            let x = radius * current_seg.cos();
+            let y = radius * current_seg.sin();
+            let z = 0.0;
+
+            vertices.push(Vertex { position: [x, y, z] });
+        }
+
+        for i in 1..segments {
+            indices.push([i + 1, i, 0]);
+        }
+
+        Self {
+            radius,
+            segments,
+            vertices,
+            indices,
+        }
+    }
 }
 
 /// Returns two vertices a certain distance from a point that can be used to form a line.
@@ -58,7 +196,12 @@ pub struct Line {
 }
 
 impl Line {
-    pub fn new(device: &wgpu::Device, coeffs: Vec<f32>, width: f32, color: Color<f32>, color_bind_group_layout: &wgpu::BindGroupLayout) -> Self {
+    pub fn new(device: &wgpu::Device,
+        coeffs: Vec<f32>,
+        width: f32, 
+        color: Color<f32>, 
+        color_bind_group_layout: &wgpu::BindGroupLayout
+    ) -> Self {
         let vertices = Vec::new();
         let indices = Vec::new();
 
@@ -164,5 +307,23 @@ mod tests {
         assert_eq!(polynomial_equation(2.0, coeffs), 29.0);
         let coeffs = &[1.0, 0.0];
         assert_eq!(polynomial_equation(2.0, coeffs), 2.0);
+    }
+
+    #[test]
+    fn circle_vertices_on_circle() {
+        use approx::relative_eq;
+
+        let radius = 1.0;
+        let circle = Circle::new(radius, 32);
+
+        for vertex in circle.vertices {
+            if vertex.position != [0.0, 0.0, 0.0] {
+                let x_squared = vertex.position[0].powf(2.0);
+                let y_squared = vertex.position[1].powf(2.0);
+                let r_squared = radius.powf(2.0);
+                
+                assert!(relative_eq!(x_squared + y_squared, r_squared));
+            }
+        }
     }
 }
