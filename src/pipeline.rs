@@ -1,9 +1,11 @@
 use wgpu::{self, util::DeviceExt, include_wgsl};
+use cgmath::prelude::*;
+
 use crate::eqn::Line;
 use crate::camera;
 use crate::vertex::{Color, Instance, InstanceRaw, Vertex};
 use crate::points::Circle;
-use cgmath::prelude::*;
+use crate::grid::get_instances;
 
 fn create_render_pipeline(
     device: &wgpu::Device,
@@ -52,6 +54,106 @@ fn create_render_pipeline(
         multiview: None,
         cache: None,
     })
+}
+
+pub struct GridPipeline {
+    pub render_pipeline: wgpu::RenderPipeline,
+    pub horizontal_buffer: wgpu::Buffer,
+    pub vertical_buffer: wgpu::Buffer,
+    pub vertical_instance_buffer: wgpu::Buffer,
+    pub horizontal_instance_buffer: wgpu::Buffer,
+    pub vertical_instances: Vec<Instance>,
+    pub horizontal_instances: Vec<Instance>,
+}
+
+impl GridPipeline {
+    pub fn new(device: &wgpu::Device, pipeline_layout: &wgpu::PipelineLayout, format: wgpu::TextureFormat) -> Self {
+        let render_pipeline = create_render_pipeline(
+            device, 
+            pipeline_layout, 
+            format,
+            &[Vertex::desc(), InstanceRaw::desc()],
+            include_wgsl!("shader.wgsl"),
+            wgpu::PrimitiveTopology::LineList,
+        );
+        
+        let horizontal_buffer = device.create_buffer(
+            &wgpu::BufferDescriptor {
+                label: Some("Horizontal Grid Buffer"),
+                size: 24,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            }
+        );
+
+        let vertical_buffer = device.create_buffer(
+            &wgpu::BufferDescriptor {
+                label: Some("Vertical Grid Buffer"),
+                size: 24,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            }
+        );
+
+        let vertical_instance_buffer = device.create_buffer(
+            &wgpu::BufferDescriptor {
+                label: Some("Grid Instance Buffer"),
+                size: 12800,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            }
+        );
+
+        let horizontal_instance_buffer = device.create_buffer(
+            &wgpu::BufferDescriptor {
+                label: Some("Grid Instance Buffer"),
+                size: 12800,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            }
+        );
+
+        let horizontal_instances = vec![];
+        let vertical_instances = vec![];
+
+        Self {
+            render_pipeline,
+            horizontal_buffer,
+            vertical_buffer,
+            vertical_instance_buffer,
+            horizontal_instance_buffer,
+            horizontal_instances,
+            vertical_instances,
+        }
+    }
+    
+    pub fn update_grid(&mut self, queue: &wgpu::Queue, camera: &camera::Camera) {
+        self.vertical_instances = get_instances(camera, true);
+        self.horizontal_instances = get_instances(camera, false);
+        self.set_buffers(queue, camera.eye.z);
+    }
+
+    fn set_buffers(&self, queue: &wgpu::Queue, sf: f32) {
+        let line_limit = sf * 2.0;
+
+        let line_horizontal: &[Vertex] = &[
+            Vertex { position: [-line_limit, 0.0, 0.0] },
+            Vertex { position: [line_limit, 0.0, 0.0] },
+        ];
+
+        let line_vertical: &[Vertex] = &[
+            Vertex { position: [0.0, line_limit, 0.0] },
+            Vertex { position: [0.0, -line_limit, 0.0] },
+        ];
+
+        let vertical_instance_data = self.vertical_instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
+        let horizontal_instance_data = self.horizontal_instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
+
+        queue.write_buffer(&self.horizontal_buffer, 0, bytemuck::cast_slice(line_horizontal));
+        queue.write_buffer(&self.vertical_buffer, 0, bytemuck::cast_slice(line_vertical));
+        queue.write_buffer(&self.horizontal_instance_buffer, 0, bytemuck::cast_slice(&horizontal_instance_data));
+        queue.write_buffer(&self.vertical_instance_buffer, 0, bytemuck::cast_slice(&vertical_instance_data));
+    }
 }
 
 pub struct EquationPipeline {

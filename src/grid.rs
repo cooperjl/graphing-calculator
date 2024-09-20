@@ -4,7 +4,7 @@ use cgmath::prelude::*;
 use crate::vertex::{Vertex, Color, Instance, InstanceRaw};
 use crate::camera;
 
-fn get_instances(camera: &camera::Camera, vertical: bool) -> Vec<Instance> {
+pub fn get_instances(camera: &camera::Camera, vertical: bool) -> Vec<Instance> {
     let base_spacing = 40.0;
     let sf = base_spacing / (camera.eye.z as u32).next_power_of_two() as f32;
 
@@ -215,137 +215,6 @@ impl Text {
             Some(physical_height),
             Some(physical_height),
         );
-    }
-}
-
-pub struct Grid {
-    pub render_pipeline: wgpu::RenderPipeline,
-    pub horizontal_buffer: wgpu::Buffer,
-    pub vertical_buffer: wgpu::Buffer,
-    pub vertical_instance_buffer: wgpu::Buffer,
-    pub horizontal_instance_buffer: wgpu::Buffer,
-    pub vertical_instances: Vec<Instance>,
-    pub horizontal_instances: Vec<Instance>,
-}
-
-impl Grid {
-    pub fn new(device: &wgpu::Device, pipeline_layout: &wgpu::PipelineLayout, config: &wgpu::SurfaceConfiguration) -> Self {
-        let line_shader = device.create_shader_module(include_wgsl!("shader.wgsl"));
-
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Grid Render Pipeline"),
-            layout: Some(pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &line_shader,
-                entry_point: "vs_main",
-                buffers: &[Vertex::desc(), InstanceRaw::desc()],
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &line_shader,
-                entry_point: "fs_main",
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::LineList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: Some(wgpu::Face::Back),
-                polygon_mode: wgpu::PolygonMode::Fill,
-                unclipped_depth: false,
-                conservative: false,
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState {
-                count: 1,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            multiview: None,
-            cache: None,
-        });
-        
-        let horizontal_buffer = device.create_buffer(
-            &wgpu::BufferDescriptor {
-                label: Some("Horizontal Grid Buffer"),
-                size: 24,
-                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            }
-        );
-
-        let vertical_buffer = device.create_buffer(
-            &wgpu::BufferDescriptor {
-                label: Some("Vertical Grid Buffer"),
-                size: 24,
-                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            }
-        );
-
-        let vertical_instance_buffer = device.create_buffer(
-            &wgpu::BufferDescriptor {
-                label: Some("Grid Instance Buffer"),
-                size: 12800,
-                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            }
-        );
-
-        let horizontal_instance_buffer = device.create_buffer(
-            &wgpu::BufferDescriptor {
-                label: Some("Grid Instance Buffer"),
-                size: 12800,
-                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            }
-        );
-
-        let horizontal_instances = vec![];
-        let vertical_instances = vec![];
-
-        Self {
-            render_pipeline,
-            horizontal_buffer,
-            vertical_buffer,
-            vertical_instance_buffer,
-            horizontal_instance_buffer,
-            horizontal_instances,
-            vertical_instances,
-        }
-    }
-    
-    pub fn update_grid(&mut self, queue: &wgpu::Queue, camera: &camera::Camera) {
-        self.vertical_instances = get_instances(camera, true);
-        self.horizontal_instances = get_instances(camera, false);
-        self.set_buffers(queue, camera.eye.z);
-    }
-
-    fn set_buffers(&self, queue: &wgpu::Queue, sf: f32) {
-        let line_limit = sf * 2.0;
-
-        let line_horizontal: &[Vertex] = &[
-            Vertex { position: [-line_limit, 0.0, 0.0] },
-            Vertex { position: [line_limit, 0.0, 0.0] },
-        ];
-
-        let line_vertical: &[Vertex] = &[
-            Vertex { position: [0.0, line_limit, 0.0] },
-            Vertex { position: [0.0, -line_limit, 0.0] },
-        ];
-
-        let vertical_instance_data = self.vertical_instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
-        let horizontal_instance_data = self.horizontal_instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
-
-        queue.write_buffer(&self.horizontal_buffer, 0, bytemuck::cast_slice(line_horizontal));
-        queue.write_buffer(&self.vertical_buffer, 0, bytemuck::cast_slice(line_vertical));
-        queue.write_buffer(&self.horizontal_instance_buffer, 0, bytemuck::cast_slice(&horizontal_instance_data));
-        queue.write_buffer(&self.vertical_instance_buffer, 0, bytemuck::cast_slice(&vertical_instance_data));
     }
 }
 

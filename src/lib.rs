@@ -23,8 +23,8 @@ struct State<'a> {
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
     camera_controller: camera::CameraController,
-    grid: grid::Grid,
     grid_text: grid::Text,
+    grid_pipeline: pipeline::GridPipeline,
     point_pipeline: pipeline::PointPipeline,
     equation_pipeline: pipeline::EquationPipeline,
 }
@@ -139,7 +139,7 @@ impl<'a> State<'a> {
         });
 
         let point_pipeline = pipeline::PointPipeline::new(&device, &render_pipeline_layout, config.format);
-        let grid = grid::Grid::new(&device, &render_pipeline_layout, &config);
+        let grid_pipeline = pipeline::GridPipeline::new(&device, &render_pipeline_layout, config.format);
         let grid_text = grid::Text::new(&device, &queue, surface_format, size);
 
         let mut equation_pipeline = pipeline::EquationPipeline::new(
@@ -163,8 +163,8 @@ impl<'a> State<'a> {
             camera_buffer,
             camera_bind_group,
             camera_controller,
-            grid,
             grid_text,
+            grid_pipeline,
             point_pipeline,
             equation_pipeline,
         }
@@ -199,7 +199,7 @@ impl<'a> State<'a> {
         self.camera_controller.update_camera(&mut self.camera, self.size);
         self.camera_uniform.update_view_proj(&self.camera);
         self.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.camera_uniform]));
-        self.grid.update_grid(&self.queue, &self.camera);
+        self.grid_pipeline.update_grid(&self.queue, &self.camera);
         self.point_pipeline.update_points(&self.queue, &self.camera);
         self.grid_text.viewport.update(&self.queue, glyphon::Resolution { width: self.config.width, height: self.config.height });
     }
@@ -209,7 +209,14 @@ impl<'a> State<'a> {
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        self.grid_text.prepare(&self.device, &self.queue, self.size, &self.camera, &self.grid.vertical_instances, &self.grid.horizontal_instances);
+        self.grid_text.prepare(
+            &self.device, 
+            &self.queue,
+            self.size, 
+            &self.camera, 
+            &self.grid_pipeline.vertical_instances,
+            &self.grid_pipeline.horizontal_instances,
+        );
 
         let output = self.surface.get_current_texture()?;
 
@@ -236,16 +243,15 @@ impl<'a> State<'a> {
 
             render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
             // grid rendering
-            render_pass.set_pipeline(&self.grid.render_pipeline);
-            render_pass.set_vertex_buffer(0, self.grid.vertical_buffer.slice(..));
-            render_pass.set_vertex_buffer(1, self.grid.vertical_instance_buffer.slice(..));
-            render_pass.draw(0..2, 0..self.grid.vertical_instances.len() as _);
-            render_pass.set_vertex_buffer(0, self.grid.horizontal_buffer.slice(..));
-            render_pass.set_vertex_buffer(1, self.grid.horizontal_instance_buffer.slice(..));
-            render_pass.draw(0..2, 0..self.grid.horizontal_instances.len() as _);
+            render_pass.set_pipeline(&self.grid_pipeline.render_pipeline);
+            render_pass.set_vertex_buffer(0, self.grid_pipeline.vertical_buffer.slice(..));
+            render_pass.set_vertex_buffer(1, self.grid_pipeline.vertical_instance_buffer.slice(..));
+            render_pass.draw(0..2, 0..self.grid_pipeline.vertical_instances.len() as _);
+            render_pass.set_vertex_buffer(0, self.grid_pipeline.horizontal_buffer.slice(..));
+            render_pass.set_vertex_buffer(1, self.grid_pipeline.horizontal_instance_buffer.slice(..));
+            render_pass.draw(0..2, 0..self.grid_pipeline.horizontal_instances.len() as _);
             // equation rendering
             render_pass.set_pipeline(&self.equation_pipeline.render_pipeline);
-            //render_pass.set_vertex_buffer(1, self.equations.instance_buffer.slice(..));
             for line in &self.equation_pipeline.lines {
                 render_pass.set_bind_group(1, &line.color_bind_group, &[]);
                 render_pass.set_vertex_buffer(0, line.vertex_buffer.slice(..));
