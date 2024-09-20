@@ -1,8 +1,6 @@
-use cgmath::num_traits::Float;
-use wgpu::{self, util::DeviceExt, include_wgsl};
+use wgpu::{self, util::DeviceExt};
 
-use crate::vertex::{Color, ColorUniform, InstanceRaw, Vertex};
-use crate::camera;
+use crate::vertex::{Color, ColorUniform, Vertex};
 
 pub enum EquationType {
     Polynomial,

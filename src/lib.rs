@@ -6,7 +6,7 @@ use wgpu::{self, util::DeviceExt};
 
 mod vertex;
 mod camera;
-mod grid;
+mod text;
 mod points;
 mod eqn;
 mod pipeline;
@@ -23,7 +23,7 @@ struct State<'a> {
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
     camera_controller: camera::CameraController,
-    grid_text: grid::Text,
+    grid_text: text::GridText,
     grid_pipeline: pipeline::GridPipeline,
     point_pipeline: pipeline::PointPipeline,
     equation_pipeline: pipeline::EquationPipeline,
@@ -140,7 +140,7 @@ impl<'a> State<'a> {
 
         let point_pipeline = pipeline::PointPipeline::new(&device, &render_pipeline_layout, config.format);
         let grid_pipeline = pipeline::GridPipeline::new(&device, &render_pipeline_layout, config.format);
-        let grid_text = grid::Text::new(&device, &queue, surface_format, size);
+        let grid_text = text::GridText::new(&device, &queue, surface_format, size);
 
         let mut equation_pipeline = pipeline::EquationPipeline::new(
             &device,
