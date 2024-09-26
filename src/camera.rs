@@ -70,27 +70,37 @@ impl Camera {
         
     /// Calculates the distance from the origin of this transformation to the cursor_location and
     /// adjusts the pan/translation in the x and y axes.
-    pub fn adjust_pan_with_cursor_position(&mut self, cursor_location: PhysicalPosition<f32>, origin: cgmath::Vector2<f32>, modifier: f32, size: PhysicalSize<u32>) {
+    pub fn adjust_pan_with_cursor_position(
+        &mut self,
+        cursor_location: PhysicalPosition<f32>, 
+        origin: cgmath::Vector2<f32>, 
+        modifier: f32, 
+        size: PhysicalSize<u32>
+    ) {
         // calculate view space positions for the cursor and origin
         let cursor_view = self.screen_to_view_space(cgmath::vec2(cursor_location.x, cursor_location.y), size);
         let origin_view = self.screen_to_view_space(origin, size);
         // calculate the distance from the cursor to the origin
         let distance = cgmath::vec2(cursor_view.x - origin_view.x, cursor_view.y - origin_view.y);
-        // scale the distance with the zoom factor
-        let change = cgmath::vec3(distance.x * self.eye.z, distance.y * self.eye.z, 0.0);
-
-        // attempt to snap onto the position when small enough for a fractional modifier as it
-        // never reaches the position even though it ideally would TODO improve this
-        let modnew = if modifier.abs()/4.0 >= (distance.x.abs().powf(2.0)*distance.y.abs().powf(2.0)).sqrt() {
-            modifier.signum()
+        // set the rate at which the pan is adjusted
+        let speed = 0.1;
+        // use the angle from the point to the origin to determine a base change
+        // make the values negative if it is a zoom in and close to origin to snap it to the origin
+        let theta = if modifier > 0.0 && distance.x.abs() + distance.y.abs() < 0.1 {
+            f32::atan2(-distance.y, -distance.x)
         } else {
-            modifier
+            f32::atan2(distance.y, distance.x)
         };
-
-        // apply a modifier, mainly used to decide which direction the change should be in
-        self.eye += change * modnew;
-        self.target += change * modnew;
-
+        let unit_change = cgmath::vec2(f32::cos(theta) * speed, f32::sin(theta) * speed);
+        // change by the smallest of either the change or the remaining distance
+        let change = cgmath::vec3(
+            (unit_change.x.abs()).min(distance.x.abs()) * self.eye.z * unit_change.x.signum(),
+            (unit_change.y.abs()).min(distance.y.abs()) * self.eye.z * unit_change.y.signum(),
+            0.0,
+        );
+        // apply a modifier which decides the direction the change should be in
+        self.eye += change * modifier;
+        self.target += change * modifier;
     }
 }
 
@@ -185,7 +195,9 @@ impl CameraController {
 
                     }
                     MouseScrollDelta::PixelDelta(position) => {
-                        self.scroll = position.y as f32;
+                        // TODO: implement smooth scrolling
+                        // self.scroll = position.y as f32;
+                        self.scroll = position.y.signum() as f32;
                         true
                     }
                 }
@@ -231,7 +243,7 @@ impl CameraController {
             camera.eye += zoom_change;
             
             let origin = camera.world_to_screen_space(cgmath::vec3(0.0, 0.0, 0.0), size);
-            camera.adjust_pan_with_cursor_position(self.cursor_location, origin, self.scroll * 0.25, size);
+            camera.adjust_pan_with_cursor_position(self.cursor_location, origin, self.scroll, size);
             self.scroll = 0.0;
         }
 
