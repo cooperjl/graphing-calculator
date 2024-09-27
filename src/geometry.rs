@@ -110,18 +110,18 @@ impl InstanceRaw {
 
 pub struct Circle {
     pub radius: f32,
-    pub segments: u32,
+    pub segments: u16,
     pub vertices: Vec<Vertex>,
-    pub indices: Vec<[u32; 3]>,
+    pub indices: Vec<u16>,
 }
 
 impl Circle {
-    pub fn new(radius: f32, segments: u32) -> Self {
+    pub fn new(radius: f32, segments: u16) -> Self {
         let mut vertices: Vec<Vertex> = Vec::new();
-        let mut indices: Vec<[u32; 3]> = Vec::new();
+        let mut indices: Vec<u16> = Vec::new();
 
         vertices.push(Vertex { position: [0.0, 0.0, 0.0] });
-        indices.push([1, segments, 0]);
+        indices.append(&mut [0, segments, 1].to_vec());
 
         for s in 0..segments {
             // trace the circle and place points along it
@@ -135,7 +135,7 @@ impl Circle {
         }
 
         for i in 1..segments {
-            indices.push([i + 1, i, 0]);
+            indices.append(&mut [0, i, i+1].to_vec());
         }
 
         Self {
@@ -260,13 +260,16 @@ impl Line {
     pub fn make_polynomial(&mut self, x_min: i32, x_max: i32) {
         self.indices = Vec::new();
         self.vertices = Vec::new();
+        
+        let step_size = (x_max.abs().saturating_add(x_min.saturating_abs()) as f32 / 40.0).ceil() as usize;
+        let unit = 20;
 
-        for (i, num) in (x_min*10..x_max*10).step_by(((x_min.abs() + x_max.abs()) as f32/20.0).ceil() as usize).enumerate() {
-            let x1 = num as f32 / 10.0;
+        for (i, num) in (x_min.saturating_mul(unit)..x_max.saturating_mul(unit)).step_by(step_size).enumerate() {
+            let x1: f32 = num as f32 / unit as f32;
             let y1 = polynomial_equation(x1, self.coeffs.as_slice());
             let p1 = cgmath::vec2(x1, y1);
 
-            let x2 = (num as f32 + 1.0) / 10.0;
+            let x2 = (num as f32 + 1.0) / unit as f32;
             let y2 = polynomial_equation(x2, self.coeffs.as_slice());
             let p2 = cgmath::vec2(x2, y2);
 

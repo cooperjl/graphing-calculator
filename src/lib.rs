@@ -147,14 +147,13 @@ impl<'a> State<'a> {
         let grid_pipeline = pipeline::GridPipeline::new(&device, &render_pipeline_layout, config.format);
         let grid_text = text::GridText::new(&device, &queue, surface_format, size);
 
-        let mut equation_pipeline = pipeline::EquationPipeline::new(
+        let equation_pipeline = pipeline::EquationPipeline::new(
             &device,
             &color_render_pipeline_layout,
             &bind_group_layout,
             config.format
         );
-        equation_pipeline.update_equations(&queue, &camera);
-        // point_pipeline.put_points(&queue, &equation_pipeline.lines[0].vertices);
+
 
         Self {
             surface,
@@ -195,7 +194,6 @@ impl<'a> State<'a> {
     }
 
     fn input(&mut self, event: &WindowEvent) -> bool {
-        self.redraw();
         self.camera_controller.process_events(event)
 
     }
@@ -207,9 +205,6 @@ impl<'a> State<'a> {
         self.grid_pipeline.update_grid(&self.queue, &self.camera);
         self.point_pipeline.update_points(&self.queue, &self.camera);
         self.grid_text.viewport.update(&self.queue, glyphon::Resolution { width: self.config.width, height: self.config.height });
-    }
-
-    fn redraw(&mut self) {
         self.equation_pipeline.update_equations(&self.queue, &self.camera);
     }
 

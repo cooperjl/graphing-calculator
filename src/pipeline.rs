@@ -289,7 +289,7 @@ impl PointPipeline {
             }
         );
 
-        let num_indices = circle.segments * 6;
+        let num_indices = (circle.segments * 3).into();
 
         let instances: Vec<Instance> = Vec::new();
         
@@ -323,14 +323,13 @@ impl PointPipeline {
 
     pub fn put_points(&mut self, queue: &wgpu::Queue, points: &Vec<Vertex>) {
         for point in points {
-            //let position = point.position;
             let position = cgmath::Vector3 { x: point.position[0], y: point.position[1], z: 0.0 };
             let rotation = if position.is_zero() {
                 cgmath::Quaternion::from_axis_angle(cgmath::Vector3::unit_z(), cgmath::Deg(0.0))
             } else {
                 cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(0.0))
             };
-            let color = Color { r: 0.0, g: 1.0, b: 0.0, a: 1.0 };
+            let color = Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 };
 
             self.instances.push(Instance {
                 position,
