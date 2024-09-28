@@ -1,7 +1,7 @@
 use cgmath::prelude::*;
 
-use crate::geometry::Instance;
-use crate::camera;
+use crate::graphing_engine::camera;
+use crate::graphing_engine::geometry::Instance;
 
 pub struct GridText {
     pub font_system: glyphon::FontSystem,
