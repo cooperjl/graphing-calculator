@@ -16,7 +16,7 @@ pub enum EquationType {
     Circle, // TODO
 }
 
-struct State<'a> {
+pub struct State<'a> {
     surface: wgpu::Surface<'a>,
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -150,7 +150,7 @@ impl<'a> State<'a> {
         let equation_pipeline = pipeline::EquationPipeline::new(
             &device,
             &color_render_pipeline_layout,
-            &bind_group_layout,
+            bind_group_layout,
             config.format
         );
 
@@ -195,7 +195,6 @@ impl<'a> State<'a> {
 
     fn input(&mut self, event: &WindowEvent) -> bool {
         self.camera_controller.process_events(event)
-
     }
 
     fn update(&mut self) {
@@ -273,6 +272,14 @@ impl<'a> State<'a> {
         self.grid_text.atlas.trim();
 
         Ok(())
+    }
+
+    pub fn add_line(&mut self, coeffs: Vec<f32>, color: geometry::Color<f32>) -> bool {
+        self.equation_pipeline.add_line(&self.device, coeffs, color)
+    }
+
+    pub fn add_point(&mut self, point: geometry::Vertex) -> bool {
+        self.point_pipeline.add_point(&self.queue, point)
     }
 }
 
