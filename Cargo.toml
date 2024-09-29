@@ -9,9 +9,12 @@ edition = "2021"
 log = "0.4"
 env_logger = "0.11"
 approx = "0.5"
-winit = "0.29"
+winit = "0.30"
 wgpu = "22.0"
 pollster = "0.3"
 bytemuck =  { version = "1.16.0", features = [ "derive" ] }
 cgmath = "0.18"
 glyphon = "0.6.0"
+egui = "0.29.0"
+egui-wgpu = { version = "0.29.0", features = [ "winit" ] }
+egui-winit = "0.29.0"
