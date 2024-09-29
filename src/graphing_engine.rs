@@ -1,7 +1,4 @@
-use winit::{
-    event::*, event_loop::EventLoop, window::{Window, WindowBuilder}
-};
-
+use winit::{event::*, window::Window};
 use wgpu::{self, util::DeviceExt};
 
 mod geometry;
@@ -35,7 +32,7 @@ pub struct State<'a> {
 }
 
 impl<'a> State<'a> {
-    async fn new(window: &'a Window) -> State<'a> {
+    pub async fn new(window: &'a Window) -> State<'a> {
         let size = window.inner_size();
         let instance = wgpu::Instance::default();
 
@@ -178,7 +175,11 @@ impl<'a> State<'a> {
         self.window
     }
 
-    fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
+    pub fn size(&self) -> winit::dpi::PhysicalSize<u32> {
+        self.size
+    }
+
+    pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
             self.size = new_size;
             self.config.width = new_size.width;
@@ -193,11 +194,11 @@ impl<'a> State<'a> {
         }
     }
 
-    fn input(&mut self, event: &WindowEvent) -> bool {
+    pub fn input(&mut self, event: &WindowEvent) -> bool {
         self.camera_controller.process_events(event)
     }
 
-    fn update(&mut self) {
+    pub fn update(&mut self) {
         self.camera_controller.update_camera(&mut self.camera, self.size);
         self.camera_uniform.update_view_proj(&self.camera);
         self.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.camera_uniform]));
@@ -207,7 +208,7 @@ impl<'a> State<'a> {
         self.equation_pipeline.update_equations(&self.queue, &self.camera);
     }
 
-    fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+    pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         self.grid_text.prepare(
             &self.device, 
             &self.queue,
@@ -283,36 +284,3 @@ impl<'a> State<'a> {
     }
 }
 
-pub async fn run() {
-    env_logger::init();
-    let event_loop = EventLoop::new().unwrap();
-    let window = WindowBuilder::new().build(&event_loop).unwrap();
-    let mut state = State::new(&window).await;
-
-    event_loop.run(move |event, elwt| {
-        match event {
-            Event::WindowEvent {
-                ref event,
-                window_id,
-            } if window_id == state.window().id() => if !state.input(event) {
-                match &event {
-                    WindowEvent::Resized(physical_size) => state.resize(*physical_size),
-                    WindowEvent::CloseRequested => elwt.exit(),
-                    WindowEvent::RedrawRequested => {
-                        state.window().request_redraw();
-                        state.update();
-
-                        match state.render() {
-                            Ok(_) => {}
-                            Err(wgpu::SurfaceError::Lost) => state.resize(state.size),
-                            Err(wgpu::SurfaceError::OutOfMemory) => elwt.exit(),
-                            Err(e) => eprintln!("{:?}", e),
-                        }
-                    },
-                    _ => {}
-                }
-            }
-            _ => {}
-        }
-    }).unwrap();
-}
