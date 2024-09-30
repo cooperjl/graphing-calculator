@@ -149,12 +149,12 @@ impl State {
 
         let size = winit::dpi::PhysicalSize::new(config.width, config.height);
 
-        let point_pipeline = pipeline::PointPipeline::new(&device, &render_pipeline_layout, config.format);
-        let grid_pipeline = pipeline::GridPipeline::new(&device, &render_pipeline_layout, config.format);
-        let grid_text = text::GridText::new(&device, &queue, config.format, size);
+        let point_pipeline = pipeline::PointPipeline::new(device, &render_pipeline_layout, config.format);
+        let grid_pipeline = pipeline::GridPipeline::new(device, &render_pipeline_layout, config.format);
+        let grid_text = text::GridText::new(device, queue, config.format, size);
 
         let equation_pipeline = pipeline::EquationPipeline::new(
-            &device,
+            device,
             &color_render_pipeline_layout,
             bind_group_layout,
             config.format
@@ -220,14 +220,13 @@ impl State {
         self.grid_text.viewport.update(queue, glyphon::Resolution { width: size.width, height: size.height });
         self.equation_pipeline.update_equations(queue, &self.camera);
     }
-    
-    pub fn render<'pass>(
-        &'pass mut self,
-        device: &wgpu::Device,
+
+    pub fn grid_prepare(
+        &mut self,
+        device: &wgpu::Device, 
         queue: &wgpu::Queue, 
-        size: winit::dpi::PhysicalSize<u32>,
-        render_pass: &mut wgpu::RenderPass<'pass>,
-    ) -> Result<(), wgpu::SurfaceError> {
+        size: winit::dpi::PhysicalSize<u32>
+    ) {
         self.grid_text.prepare(
             device, 
             queue,
@@ -236,36 +235,45 @@ impl State {
             &self.grid_pipeline.vertical_instances,
             &self.grid_pipeline.horizontal_instances,
         );
+    }
+    
+    pub fn render<'render_pass>(
+        &'render_pass self,
+        render_pass: &mut wgpu::RenderPass<'render_pass>,
+    ) -> Result<(), wgpu::SurfaceError> {
 
-            render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
-            // grid rendering
-            render_pass.set_pipeline(&self.grid_pipeline.render_pipeline);
-            render_pass.set_vertex_buffer(0, self.grid_pipeline.vertical_buffer.slice(..));
-            render_pass.set_vertex_buffer(1, self.grid_pipeline.vertical_instance_buffer.slice(..));
-            render_pass.draw(0..2, 0..self.grid_pipeline.vertical_instances.len() as _);
-            render_pass.set_vertex_buffer(0, self.grid_pipeline.horizontal_buffer.slice(..));
-            render_pass.set_vertex_buffer(1, self.grid_pipeline.horizontal_instance_buffer.slice(..));
-            render_pass.draw(0..2, 0..self.grid_pipeline.horizontal_instances.len() as _);
-            // equation rendering
-            render_pass.set_pipeline(&self.equation_pipeline.render_pipeline);
-            for line in &self.equation_pipeline.lines {
-                render_pass.set_bind_group(1, &line.color_bind_group, &[]);
-                render_pass.set_vertex_buffer(0, line.vertex_buffer.slice(..));
-                render_pass.set_index_buffer(line.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-                render_pass.draw_indexed(0..line.indices.len() as u32, 0, 0..1);
-            }
-            // point rendering
-            render_pass.set_pipeline(&self.point_pipeline.render_pipeline);
-            render_pass.set_vertex_buffer(0, self.point_pipeline.vertex_buffer.slice(..));
-            render_pass.set_vertex_buffer(1, self.point_pipeline.instance_buffer.slice(..));
-            render_pass.set_index_buffer(self.point_pipeline.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            render_pass.draw_indexed(0..self.point_pipeline.num_indices, 0, 0..self.point_pipeline.instances.len() as _);
+        render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
+        // grid rendering
+        render_pass.set_pipeline(&self.grid_pipeline.render_pipeline);
+        render_pass.set_vertex_buffer(0, self.grid_pipeline.vertical_buffer.slice(..));
+        render_pass.set_vertex_buffer(1, self.grid_pipeline.vertical_instance_buffer.slice(..));
+        render_pass.draw(0..2, 0..self.grid_pipeline.vertical_instances.len() as _);
+        render_pass.set_vertex_buffer(0, self.grid_pipeline.horizontal_buffer.slice(..));
+        render_pass.set_vertex_buffer(1, self.grid_pipeline.horizontal_instance_buffer.slice(..));
+        render_pass.draw(0..2, 0..self.grid_pipeline.horizontal_instances.len() as _);
 
+        // equation rendering 
+        render_pass.set_pipeline(&self.equation_pipeline.render_pipeline);
+        for line in &self.equation_pipeline.lines {
+            render_pass.set_bind_group(1, &line.color_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, line.vertex_buffer.slice(..));
+            render_pass.set_index_buffer(line.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            render_pass.draw_indexed(0..line.indices.len() as u32, 0, 0..1);
+        }
+        // point rendering
+        render_pass.set_pipeline(&self.point_pipeline.render_pipeline);
+        render_pass.set_vertex_buffer(0, self.point_pipeline.vertex_buffer.slice(..));
+        render_pass.set_vertex_buffer(1, self.point_pipeline.instance_buffer.slice(..));
+        render_pass.set_index_buffer(self.point_pipeline.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+        render_pass.draw_indexed(0..self.point_pipeline.num_indices, 0, 0..self.point_pipeline.instances.len() as _);
         
         self.grid_text.text_renderer.render(&self.grid_text.atlas, &self.grid_text.viewport, render_pass).unwrap(); 
-        self.grid_text.atlas.trim();
 
         Ok(())
+    }
+
+    pub fn trim_atlas(&mut self) {
+        self.grid_text.atlas.trim();
     }
     
 

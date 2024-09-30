@@ -21,12 +21,14 @@ pub async fn run() {
 }
 
 struct App {
-    state: Option<State>,
+    state: Option<AppState>,
 }
 
 impl App {
     pub fn new() -> Self {
-        Self { state: None }
+        Self { 
+            state: None,
+        }
     }
 }
 
@@ -35,7 +37,7 @@ impl ApplicationHandler for App {
         let window = event_loop
             .create_window(Window::default_attributes().with_title("graphing calculator"))
             .unwrap();
-        self.state = Some(State::new(window));
+        self.state = Some(AppState::new(window));
     }
 
     fn window_event(
@@ -46,12 +48,12 @@ impl ApplicationHandler for App {
         ) {
         let state = self.state.as_mut().unwrap();
 
-        if window_id == state.window().id() && !state.input(&event) {
+        if window_id == state.window().id() && !state.graphing_engine.input(&event) {
             match event {
                 WindowEvent::Resized(physical_size) => state.resize(physical_size),
                 WindowEvent::CloseRequested => event_loop.exit(),
                 WindowEvent::RedrawRequested => {
-                    state.update();
+                    state.graphing_engine.update(&state.queue, state.size());
 
                     match state.render() {
                         Ok(_) => {}
@@ -81,6 +83,7 @@ struct AppState {
     window: Arc<Window>,
 
     graphing_engine: graphing_engine::State,
+    gui_renderer: gui::GuiRenderer,
 
 }
 
@@ -128,6 +131,7 @@ impl AppState {
         };
 
         let graphing_engine = State::new(&device, &queue, &config);
+        let gui_renderer = gui::GuiRenderer::new(&device, &window_arc, config.format);
 
         Self {
             surface,
@@ -137,6 +141,7 @@ impl AppState {
             size,
             window: window_arc,
             graphing_engine,
+            gui_renderer,
         }
     }
 
@@ -155,6 +160,8 @@ impl AppState {
             self.config.height = new_size.height;
 
             self.surface.configure(&self.device, &self.config);
+
+            self.graphing_engine.resize(new_size);
         }
     }
 
@@ -165,7 +172,7 @@ impl AppState {
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Render Encoder"),
         });
-
+        
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
@@ -181,11 +188,35 @@ impl AppState {
                 occlusion_query_set: None,
                 timestamp_writes: None,
             });
+
+            self.graphing_engine.grid_prepare(&self.device, &self.queue, self.size);
+
             
-            self.graphing_engine.render(&self.device, &self.queue, self.size, &mut render_pass);
-            //self.gui.draw();
+            match self.graphing_engine.render(&mut render_pass) {
+                Ok(_) => {}
+                Err(e) => eprintln!("{:?}", e),
+            }
+
+            let screen_descriptor = egui_wgpu::ScreenDescriptor {
+                size_in_pixels: [self.config.width, self.config.height],
+                pixels_per_point: self.window().scale_factor() as f32 * 1.0,
+            };
+
+            let window = &self.window;
+
+            self.gui_renderer.draw(
+                &self.device,
+                &self.queue,
+                &mut encoder, 
+                window,
+                &view,
+                &screen_descriptor,
+            );
         }
 
+        self.queue.submit(std::iter::once(encoder.finish()));
+        output.present();
+        self.graphing_engine.trim_atlas();
         
         Ok(())
     }

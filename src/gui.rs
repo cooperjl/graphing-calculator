@@ -39,8 +39,8 @@ impl GuiRenderer {
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
         window: &winit::window::Window,
-        render_pass: &mut wgpu::RenderPass<'static>,
-        //view: &wgpu::TextureView,
+        //render_pass: &mut wgpu::RenderPass<'static>,
+        view: &wgpu::TextureView,
         screen_descriptor: &egui_wgpu::ScreenDescriptor,
     ) {
         self.egui_state.egui_ctx().set_pixels_per_point(screen_descriptor.pixels_per_point);
@@ -62,18 +62,8 @@ impl GuiRenderer {
             self.egui_renderer.update_texture(device, queue, *id, image_delta);
         }
         self.egui_renderer.update_buffers(device, queue, encoder, &triangles, screen_descriptor);
-        self.egui_renderer.render(render_pass, &triangles, screen_descriptor);
-
-        for id in &full_output.textures_delta.free {
-            self.egui_renderer.free_texture(id);
-        }
-
-        // TODO: there should only be one render pass! i haven't decided if this or the engine
-        // should own it (or maybe the new state im gonna make loolllll)
-        /*
-        {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("egui render pass"),
+                label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view,
                     resolve_target: None,
@@ -86,13 +76,11 @@ impl GuiRenderer {
                 occlusion_query_set: None,
                 timestamp_writes: None,
             });
-            self.egui_renderer.render(&mut render_pass, &triangles, screen_descriptor)
+
+        self.egui_renderer.render(&mut render_pass, &triangles, screen_descriptor);
+
+        for id in &full_output.textures_delta.free {
+            self.egui_renderer.free_texture(id);
         }
-        */
-
-
-       
     }
-
-
 }
