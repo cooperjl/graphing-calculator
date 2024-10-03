@@ -11,6 +11,7 @@ use winit::window::{Window, WindowId};
 use winit::dpi::PhysicalSize;
 
 use graphing_engine::State;
+use graphing_engine::Color;
 
 pub async fn run() {
     env_logger::init();
@@ -48,7 +49,7 @@ impl ApplicationHandler for App {
         ) {
         let state = self.state.as_mut().unwrap();
 
-        if window_id == state.window().id() && !state.graphing_engine.input(&event) {
+        if window_id == state.window().id() && !state.input(&event) {
             match event {
                 WindowEvent::Resized(physical_size) => state.resize(physical_size),
                 WindowEvent::CloseRequested => event_loop.exit(),
@@ -130,7 +131,11 @@ impl AppState {
             desired_maximum_frame_latency: 2,
         };
 
-        let graphing_engine = State::new(&device, &queue, &config);
+        let mut graphing_engine = State::new(&device, &queue, &config);
+
+        let color = Color { r: 1.0, g: 0.0, b: 0.0, a: 1.0 };
+        graphing_engine.add_line(&device, 0, Vec::new(), color);
+
         let gui_renderer = gui::GuiRenderer::new(&device, &window_arc, config.format);
 
         Self {
@@ -165,6 +170,19 @@ impl AppState {
         }
     }
 
+    pub fn input(&mut self, event: &WindowEvent) -> bool {
+        let coeffs = self.gui_renderer.equation
+            .split(",")
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .map(|s| s.parse().unwrap())
+            .collect::<Vec<f32>>();
+
+        self.graphing_engine.update_line(0, coeffs);
+
+        self.gui_renderer.input(&self.window, event) || self.graphing_engine.input(event)
+    }
+
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
 
@@ -190,29 +208,26 @@ impl AppState {
             });
 
             self.graphing_engine.grid_prepare(&self.device, &self.queue, self.size);
-
             
             match self.graphing_engine.render(&mut render_pass) {
                 Ok(_) => {}
                 Err(e) => eprintln!("{:?}", e),
             }
-
-            let screen_descriptor = egui_wgpu::ScreenDescriptor {
-                size_in_pixels: [self.config.width, self.config.height],
-                pixels_per_point: self.window().scale_factor() as f32 * 1.0,
-            };
-
-            let window = &self.window;
-
-            self.gui_renderer.draw(
-                &self.device,
-                &self.queue,
-                &mut encoder, 
-                window,
-                &view,
-                &screen_descriptor,
-            );
         }
+
+        let screen_descriptor = egui_wgpu::ScreenDescriptor {
+            size_in_pixels: [self.config.width, self.config.height],
+            pixels_per_point: self.window().scale_factor() as f32 * 1.0,
+        };
+
+        self.gui_renderer.render(
+            &self.device,
+            &self.queue,
+            &mut encoder,
+            &self.window,
+            &view,
+            &screen_descriptor,
+        );
 
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();

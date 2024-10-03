@@ -229,10 +229,21 @@ impl EquationPipeline {
         }
     }
 
-    pub fn add_line(&mut self, device: &wgpu::Device, coeffs: Vec<f32>, color: Color<f32>) -> bool {
+    pub fn add_line(&mut self, device: &wgpu::Device, label: u32, coeffs: Vec<f32>, color: Color<f32>) -> bool {
+        // TODO: use dict with label
         let line = Line::new(device, coeffs, 0.025, color, &self.color_bind_group_layout);
         self.lines.push(line);
         true
+    }
+
+    pub fn update_line(&mut self, label: u32, coeffs: Vec<f32>) -> bool {
+        match self.lines.get_mut(label as usize) {
+            Some(line) => {
+                line.coeffs = coeffs;
+                true
+            }
+            None => false
+        }
     }
 
     pub fn update_equations(&mut self, queue: &wgpu::Queue, camera: &camera::Camera) {

@@ -1,6 +1,8 @@
 pub struct GuiRenderer {
     egui_state: egui_winit::State,
     egui_renderer: egui_wgpu::Renderer,
+
+    pub equation: String,
 }
 
 impl GuiRenderer {
@@ -23,17 +25,25 @@ impl GuiRenderer {
             device, 
             color_format,
             None,
-            2,
+            1,
             false,
         );
+
+        let equation = String::new();
 
         Self {
             egui_state,
             egui_renderer,
+
+            equation,
         }
     }
 
-    pub fn draw(
+    pub fn input(&mut self, window: &winit::window::Window, event: &winit::event::WindowEvent) -> bool {
+        self.egui_state.on_window_event(window, event).consumed
+    }
+
+    pub fn render(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
@@ -47,8 +57,16 @@ impl GuiRenderer {
 
         let input = self.egui_state.take_egui_input(window);
         let full_output = self.egui_state.egui_ctx().run(input, |ctx| {
-            egui::CentralPanel::default().show(ctx, |ui| {
-                ui.label("test!");
+            egui::SidePanel::new(
+                egui::panel::Side::Left,
+                egui::Id::new("left panel")
+            ).show(ctx, |ui| {
+                ui.label("Equations");
+                let response = ui.text_edit_singleline(&mut self.equation);
+
+                if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                    println!("{}", self.equation);
+                }
             });
         });
 
@@ -61,14 +79,16 @@ impl GuiRenderer {
         for (id, image_delta) in &full_output.textures_delta.set {
             self.egui_renderer.update_texture(device, queue, *id, image_delta);
         }
+
         self.egui_renderer.update_buffers(device, queue, encoder, &triangles, screen_descriptor);
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        {
+            let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
+                        load: wgpu::LoadOp::Load,
                         store: wgpu::StoreOp::Store,
                     },
                 })],
@@ -77,10 +97,12 @@ impl GuiRenderer {
                 timestamp_writes: None,
             });
 
-        self.egui_renderer.render(&mut render_pass, &triangles, screen_descriptor);
+            self.egui_renderer.render(&mut render_pass.forget_lifetime(), &triangles, screen_descriptor);
+        }
 
         for id in &full_output.textures_delta.free {
             self.egui_renderer.free_texture(id);
         }
+        
     }
 }
