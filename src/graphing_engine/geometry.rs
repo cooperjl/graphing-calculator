@@ -306,9 +306,9 @@ mod tests {
     fn test_polynomial_equation() {
         let coeffs = &[];
         assert_eq!(polynomial_equation(2.0, coeffs), 0.0);
-        let coeffs = &[1.0, 4.0, 3.0, -1.0];
+        let coeffs = &[-1.0, 3.0, 4.0, 1.0];
         assert_eq!(polynomial_equation(2.0, coeffs), 29.0);
-        let coeffs = &[1.0, 0.0];
+        let coeffs = &[0.0, 1.0];
         assert_eq!(polynomial_equation(2.0, coeffs), 2.0);
     }
 
