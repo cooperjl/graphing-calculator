@@ -10,6 +10,8 @@ use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::window::{Window, WindowId};
 use winit::dpi::PhysicalSize;
 
+use regex::Regex;
+
 use graphing_engine::State;
 use graphing_engine::Color;
 
@@ -170,15 +172,64 @@ impl AppState {
         }
     }
 
-    pub fn input(&mut self, event: &WindowEvent) -> bool {
-        let coeffs = self.gui_renderer.equation
-            .split(",")
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty())
-            .map(|s| s.parse().unwrap())
-            .collect::<Vec<f32>>();
+    fn process_equation(&self, equation: &str) -> Result<Vec<f32>, std::num::ParseFloatError> {
+        // TODO: possibly expensive so reuse this as explained in regex docs
+        let re = Regex::new(r"([+-]?[^+-]+)").unwrap();
+        let split_eqn = equation.split_whitespace().collect::<String>();
+        
+        let mut coeffs: Vec<f32> = Vec::new();
 
-        self.graphing_engine.update_line(0, coeffs);
+        let eqn: Vec<_> = re.find_iter(split_eqn.as_str()).map(|m| m.as_str()).collect();
+
+        for exp in eqn {
+            let parts = exp.split('x').collect::<Vec<_>>();
+
+            let key = if parts.len() > 1 {
+                let last = parts.last().unwrap();
+
+                if !last.is_empty() {
+                    let last_last = last.chars().last().unwrap().to_digit(10);
+                    if let Some(pow) = last_last {
+                        pow
+                    } else {
+                        // may have to raise an error here if it causes strange behaviour, seems
+                        // fine so far though. e.g. when removing line when broken and stuff
+                        1
+                    }
+                } else {
+                    1
+                }
+            } else {
+                0
+            };
+            
+            let first = parts.first().unwrap();
+            let val = if first.is_empty() {
+                1.0
+            } else {
+                parts.first().unwrap().parse::<f32>()?
+            };
+
+            match coeffs.get_mut(key as usize) {
+                Some(o) => *o += val,
+                None => {
+                    coeffs.resize(key as usize, 0.0);
+                    coeffs.push(val);
+                }
+            }
+        }
+
+        Ok(coeffs)
+    }
+
+    pub fn input(&mut self, event: &WindowEvent) -> bool {
+        // TODO: should do this when the input box changes only.
+        let coeffs_result = self.process_equation(self.gui_renderer.equation.as_str());
+        
+        match coeffs_result {
+            Ok(coeffs) => self.graphing_engine.update_line(0, coeffs),
+            Err(_) => false, // TODO: remove line in this case since it is broken
+        };
 
         self.gui_renderer.input(&self.window, event) || self.graphing_engine.input(event)
     }

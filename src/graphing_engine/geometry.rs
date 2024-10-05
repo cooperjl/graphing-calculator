@@ -175,10 +175,10 @@ fn square_points(p1: cgmath::Vector2<f32>, p2: cgmath::Vector2<f32>, width: f32,
 
 /// Returns the corresponding y value to the x value for a polynomial equation.
 ///
-/// Takes x as an input, as well as a list of coefficients ordered from the largest order to the
-/// smallest, including x^0.
+/// Takes x as an input, as well as a list of coefficients ordered from the smallest order to the
+/// largest, including x^0.
 fn polynomial_equation(x: f32, coeffs: &[f32]) -> f32 {
-    coeffs.iter().rev().enumerate()
+    coeffs.iter().enumerate()
         .map(|(i, coeff)| coeff * x.powi(i as i32))
         .sum::<f32>()
         //.min(max_y)
