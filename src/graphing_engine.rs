@@ -207,8 +207,8 @@ impl State {
         self.equation_pipeline.add_line(device, label, coeffs, color)
     }
 
-    pub fn update_line(&mut self, label: u32, coeffs: Vec<f32>) -> bool {
-        self.equation_pipeline.update_line(label, coeffs)
+    pub fn update_line(&mut self, label: u32, equation: &str) -> bool {
+        self.equation_pipeline.update_line(label, equation)
     }
 
     pub fn add_point(&mut self, queue: &wgpu::Queue, point: geometry::Vertex) -> bool {
