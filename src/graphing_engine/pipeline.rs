@@ -205,6 +205,52 @@ impl GridPipeline {
     }
 }
 
+/// Returns coefficients for Line::make_polynomial if successful. 
+///
+/// Takes a string which represents a polynomial equation, using ^ to represent exponent.
+fn parse_equation(equation: &str) -> Result<Vec<f32>> {
+    // TODO: possibly expensive so reuse this as explained in regex docs
+    let re = Regex::new(r"([+-]?[^+-]+)").unwrap();
+    let split_eqn = equation.split_whitespace().collect::<String>();
+    
+    let mut coeffs: Vec<f32> = Vec::new();
+
+    let eqn: Vec<_> = re.find_iter(split_eqn.as_str()).map(|m| m.as_str()).collect();
+
+    for exp in eqn {
+        let parts = exp.split('x').collect::<Vec<_>>();
+
+        let key = if parts.len() > 1 {
+            let last = parts.last().unwrap();
+
+            if !last.is_empty() {
+                last[1..].parse::<u32>()?
+            } else {
+                1
+            }
+        } else {
+            0
+        };
+        
+        let first = parts.first().unwrap();
+        let val = if first.is_empty() {
+            1.0
+        } else {
+            first.parse::<f32>()?
+        };
+
+        match coeffs.get_mut(key as usize) {
+            Some(o) => *o += val,
+            None => {
+                coeffs.resize(key as usize, 0.0);
+                coeffs.push(val);
+            }
+        }
+    }
+
+    Ok(coeffs)
+}
+
 pub struct EquationPipeline {
     pub render_pipeline: wgpu::RenderPipeline,
     pub lines: Vec<Line>,
@@ -239,7 +285,7 @@ impl EquationPipeline {
     }
 
     pub fn update_line(&mut self, label: u32, equation: &str) -> bool {
-        match self.parse_equation(equation) {
+        match parse_equation(equation) {
             Ok(coeffs) => {
                 match self.lines.get_mut(label as usize) {
                     Some(line) => {
@@ -267,51 +313,6 @@ impl EquationPipeline {
         }
     }
 
-    /// Returns coefficients for Line::make_polynomial if successful. 
-    ///
-    /// Takes a string which represents a polynomial equation, using ^ to represent exponent.
-    fn parse_equation(&self, equation: &str) -> Result<Vec<f32>> {
-        // TODO: possibly expensive so reuse this as explained in regex docs
-        let re = Regex::new(r"([+-]?[^+-]+)").unwrap();
-        let split_eqn = equation.split_whitespace().collect::<String>();
-        
-        let mut coeffs: Vec<f32> = Vec::new();
-
-        let eqn: Vec<_> = re.find_iter(split_eqn.as_str()).map(|m| m.as_str()).collect();
-
-        for exp in eqn {
-            let parts = exp.split('x').collect::<Vec<_>>();
-
-            let key = if parts.len() > 1 {
-                let last = parts.last().unwrap();
-
-                if !last.is_empty() {
-                    last[1..].parse::<u32>()?
-                } else {
-                    1
-                }
-            } else {
-                0
-            };
-            
-            let first = parts.first().unwrap();
-            let val = if first.is_empty() {
-                1.0
-            } else {
-                parts.first().unwrap().parse::<f32>()?
-            };
-
-            match coeffs.get_mut(key as usize) {
-                Some(o) => *o += val,
-                None => {
-                    coeffs.resize(key as usize, 0.0);
-                    coeffs.push(val);
-                }
-            }
-        }
-
-        Ok(coeffs)
-    }
 }
 
 pub struct PointPipeline {
@@ -437,7 +438,6 @@ mod tests {
             }
         }
     }
-
     #[test]
     fn next_zoom_level_is_double() {
         // using a zoom level of 20 for testing purposes
@@ -477,5 +477,68 @@ mod tests {
             assert_eq!(instance1.position.y * 2.0, instance2.position.y);
         }
     }
+    #[test]
+    fn test_parse_equation_standard() {
+        let equation = "3x^3-4x^2-3x+5";
+        let coeffs = parse_equation(equation).unwrap();
+
+        assert_eq!(coeffs, [5.0, -3.0, -4.0, 3.0]);
+    }
+    #[test]
+    fn test_parse_equation_spacing() {
+        let equation = " 3 x^3 -    4x^2 - 3x+    5 ";
+        let coeffs = parse_equation(equation).unwrap();
+
+        assert_eq!(coeffs, [5.0, -3.0, -4.0, 3.0]);
+    }
+    #[test]
+    fn test_parse_equation_multiple_same_exp() {
+        let equation = " 3x^3 + 3x^3 - 2x^3  -4x^2-3x+5";
+        let coeffs = parse_equation(equation).unwrap();
+
+        assert_eq!(coeffs, [5.0, -3.0, -4.0, 4.0]);
+    }
+    #[test]
+    fn test_parse_equation_missing_terms() {
+        let equation = "3x^3";
+        let coeffs = parse_equation(equation).unwrap();
+
+        assert_eq!(coeffs, [0.0, 0.0, 0.0, 3.0]);
+    }
+    #[test]
+    fn test_parse_equation_one_x() {
+        let equation = "x^3";
+        let coeffs = parse_equation(equation).unwrap();
+
+        assert_eq!(coeffs, [0.0, 0.0, 0.0, 1.0]);
+    }
+    #[test]
+    fn test_parse_equation_neg_plus_one_x() {
+        let equation = "-x^3";
+        let coeffs = parse_equation(equation).unwrap();
+
+        assert_eq!(coeffs, [0.0, 0.0, 0.0, -1.0]);
+
+        let equation = "+x^3";
+        let coeffs = parse_equation(equation).unwrap();
+
+        assert_eq!(coeffs, [0.0, 0.0, 0.0, 1.0]);
+    }
+    #[test]
+    fn test_parse_equation_empty() {
+        let equation = "";
+        let coeffs = parse_equation(equation).unwrap();
+
+        assert_eq!(coeffs, []);
+    }
+    #[test]
+    fn test_parse_equation_invalid() {
+        let equation = "this is not a valid equation!";
+        let coeffs = parse_equation(equation);
+
+        assert!(coeffs.is_err());
+    }
+
+
 }
 
