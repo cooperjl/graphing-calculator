@@ -175,14 +175,12 @@ fn square_points(p1: cgmath::Vector2<f32>, p2: cgmath::Vector2<f32>, width: f32,
 
 /// Returns the corresponding y value to the x value for a polynomial equation.
 ///
-/// Takes x as an input, as well as a list of coefficients ordered from the largest order to the
-/// smallest, including x^0.
+/// Takes x as an input, as well as a list of coefficients ordered from the smallest order to the
+/// largest, including x^0.
 fn polynomial_equation(x: f32, coeffs: &[f32]) -> f32 {
-    coeffs.iter().rev().enumerate()
+    coeffs.iter().enumerate()
         .map(|(i, coeff)| coeff * x.powi(i as i32))
         .sum::<f32>()
-        //.min(max_y)
-        //.max(min_y)
 }
 
 pub struct Line {
@@ -257,10 +255,19 @@ impl Line {
         }
     }
 
-    pub fn make_polynomial(&mut self, x_min: i32, x_max: i32) {
+    pub fn update_polynomial(&mut self, x_min: i32, x_max: i32) -> bool {
         self.indices = Vec::new();
         self.vertices = Vec::new();
-        
+
+        if self.coeffs.is_empty() {
+            false
+        } else {
+            self.make_polynomial(x_min, x_max);
+            true
+        }
+    }
+
+    fn make_polynomial(&mut self, x_min: i32, x_max: i32) {
         let step_size = (x_max.abs().saturating_add(x_min.saturating_abs()) as f32 / 40.0).ceil() as usize;
         let unit = 20;
 
@@ -306,9 +313,9 @@ mod tests {
     fn test_polynomial_equation() {
         let coeffs = &[];
         assert_eq!(polynomial_equation(2.0, coeffs), 0.0);
-        let coeffs = &[1.0, 4.0, 3.0, -1.0];
+        let coeffs = &[-1.0, 3.0, 4.0, 1.0];
         assert_eq!(polynomial_equation(2.0, coeffs), 29.0);
-        let coeffs = &[1.0, 0.0];
+        let coeffs = &[0.0, 1.0];
         assert_eq!(polynomial_equation(2.0, coeffs), 2.0);
     }
 

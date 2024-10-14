@@ -1,4 +1,4 @@
-use winit::{event::*, window::Window};
+use winit::event::*;
 use wgpu::{self, util::DeviceExt};
 
 mod geometry;
@@ -6,20 +6,18 @@ mod camera;
 mod pipeline;
 mod text;
 
+pub use geometry::Color;
+
+/*
 pub enum EquationType {
     Polynomial,
     Exponential, // TODO
     Trigonometric, // TODO
     Circle, // TODO
 }
+*/
 
-pub struct State<'a> {
-    surface: wgpu::Surface<'a>,
-    device: wgpu::Device,
-    queue: wgpu::Queue,
-    config: wgpu::SurfaceConfiguration,
-    size: winit::dpi::PhysicalSize<u32>,
-    window: &'a Window,
+pub struct State {
     camera: camera::Camera,
     camera_uniform: camera::CameraUniform,
     camera_buffer: wgpu::Buffer,
@@ -31,48 +29,8 @@ pub struct State<'a> {
     equation_pipeline: pipeline::EquationPipeline,
 }
 
-impl<'a> State<'a> {
-    pub async fn new(window: &'a Window) -> State<'a> {
-        let size = window.inner_size();
-        let instance = wgpu::Instance::default();
-
-        let surface = instance.create_surface(window).unwrap();
-
-        let adapter = instance.request_adapter(
-            &wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::default(),
-                force_fallback_adapter: false,
-                compatible_surface: Some(&surface),
-            },
-        ).await.unwrap();
-
-        let (device, queue) = adapter.request_device(
-            &wgpu::DeviceDescriptor {
-                label: None,
-                required_features: wgpu::Features::empty(),
-                required_limits: wgpu::Limits::default(),
-                memory_hints: wgpu::MemoryHints::Performance,
-            },
-            None,
-        ).await.unwrap();
-
-        let surface_caps = surface.get_capabilities(&adapter);
-        let surface_format = surface_caps.formats.iter()
-            .copied()
-            .find(|f| f.is_srgb())
-            .unwrap_or(surface_caps.formats[0]);
-        
-        let config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface_format,
-            width: size.width,
-            height: size.height,
-            present_mode: surface_caps.present_modes[0],
-            alpha_mode: surface_caps.alpha_modes[0],
-            view_formats: vec![],
-            desired_maximum_frame_latency: 2,
-        };
-
+impl State {
+    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, config: &wgpu::SurfaceConfiguration) -> State {
         let camera = camera::Camera {
             eye: (0.0, 0.0, 4.0).into(),
             target: (0.0, 0.0, 0.0).into(),
@@ -140,12 +98,14 @@ impl<'a> State<'a> {
             push_constant_ranges: &[],
         });
 
-        let point_pipeline = pipeline::PointPipeline::new(&device, &render_pipeline_layout, config.format);
-        let grid_pipeline = pipeline::GridPipeline::new(&device, &render_pipeline_layout, config.format);
-        let grid_text = text::GridText::new(&device, &queue, surface_format, size);
+        let size = winit::dpi::PhysicalSize::new(config.width, config.height);
+
+        let point_pipeline = pipeline::PointPipeline::new(device, &render_pipeline_layout, config.format);
+        let grid_pipeline = pipeline::GridPipeline::new(device, &render_pipeline_layout, config.format);
+        let grid_text = text::GridText::new(device, queue, config.format, size);
 
         let equation_pipeline = pipeline::EquationPipeline::new(
-            &device,
+            device,
             &color_render_pipeline_layout,
             bind_group_layout,
             config.format
@@ -153,12 +113,6 @@ impl<'a> State<'a> {
 
 
         Self {
-            surface,
-            device,
-            queue,
-            config,
-            size,
-            window,
             camera,
             camera_uniform,
             camera_buffer,
@@ -171,26 +125,12 @@ impl<'a> State<'a> {
         }
     }
 
-    pub fn window(&self) -> &Window {
-        self.window
-    }
-
-    pub fn size(&self) -> winit::dpi::PhysicalSize<u32> {
-        self.size
-    }
-
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
-        if new_size.width > 0 && new_size.height > 0 {
-            self.size = new_size;
-            self.config.width = new_size.width;
-            self.config.height = new_size.height;
-            self.surface.configure(&self.device, &self.config);
-            self.grid_text.resize(new_size);
+        self.grid_text.resize(new_size);
 
-            let new_aspect = new_size.width as f32 / new_size.height as f32;
-            if new_aspect <= 3.0 {
-                self.camera.aspect = new_aspect;
-            }
+        let new_aspect = new_size.width as f32 / new_size.height as f32;
+        if new_aspect <= 3.0 {
+            self.camera.aspect = new_aspect;
         }
     }
 
@@ -198,89 +138,81 @@ impl<'a> State<'a> {
         self.camera_controller.process_events(event)
     }
 
-    pub fn update(&mut self) {
-        self.camera_controller.update_camera(&mut self.camera, self.size);
+    pub fn update(&mut self, queue: &wgpu::Queue, size: winit::dpi::PhysicalSize<u32>) {
+        self.camera_controller.update_camera(&mut self.camera, size);
         self.camera_uniform.update_view_proj(&self.camera);
-        self.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.camera_uniform]));
-        self.grid_pipeline.update_grid(&self.queue, &self.camera);
-        self.point_pipeline.update_points(&self.queue, &self.camera);
-        self.grid_text.viewport.update(&self.queue, glyphon::Resolution { width: self.config.width, height: self.config.height });
-        self.equation_pipeline.update_equations(&self.queue, &self.camera);
+        queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.camera_uniform]));
+        self.grid_pipeline.update_grid(queue, &self.camera);
+        self.point_pipeline.update_points(queue, &self.camera);
+        self.grid_text.viewport.update(queue, glyphon::Resolution { width: size.width, height: size.height });
+        self.equation_pipeline.update_equations(queue, &self.camera);
     }
 
-    pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+    pub fn grid_prepare(
+        &mut self,
+        device: &wgpu::Device, 
+        queue: &wgpu::Queue, 
+        size: winit::dpi::PhysicalSize<u32>
+    ) {
         self.grid_text.prepare(
-            &self.device, 
-            &self.queue,
-            self.size, 
+            device, 
+            queue,
+            size, 
             &self.camera, 
             &self.grid_pipeline.vertical_instances,
             &self.grid_pipeline.horizontal_instances,
         );
+    }
+    
+    pub fn render<'render_pass>(
+        &'render_pass self,
+        render_pass: &mut wgpu::RenderPass<'render_pass>,
+    ) -> Result<(), wgpu::SurfaceError> {
 
-        let output = self.surface.get_current_texture()?;
+        render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
+        // grid rendering
+        render_pass.set_pipeline(&self.grid_pipeline.render_pipeline);
+        render_pass.set_vertex_buffer(0, self.grid_pipeline.vertical_buffer.slice(..));
+        render_pass.set_vertex_buffer(1, self.grid_pipeline.vertical_instance_buffer.slice(..));
+        render_pass.draw(0..2, 0..self.grid_pipeline.vertical_instances.len() as _);
+        render_pass.set_vertex_buffer(0, self.grid_pipeline.horizontal_buffer.slice(..));
+        render_pass.set_vertex_buffer(1, self.grid_pipeline.horizontal_instance_buffer.slice(..));
+        render_pass.draw(0..2, 0..self.grid_pipeline.horizontal_instances.len() as _);
 
-        let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Render Encoder"),
-        });
-
-        {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Render Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                occlusion_query_set: None,
-                timestamp_writes: None,
-            });
-
-            render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
-            // grid rendering
-            render_pass.set_pipeline(&self.grid_pipeline.render_pipeline);
-            render_pass.set_vertex_buffer(0, self.grid_pipeline.vertical_buffer.slice(..));
-            render_pass.set_vertex_buffer(1, self.grid_pipeline.vertical_instance_buffer.slice(..));
-            render_pass.draw(0..2, 0..self.grid_pipeline.vertical_instances.len() as _);
-            render_pass.set_vertex_buffer(0, self.grid_pipeline.horizontal_buffer.slice(..));
-            render_pass.set_vertex_buffer(1, self.grid_pipeline.horizontal_instance_buffer.slice(..));
-            render_pass.draw(0..2, 0..self.grid_pipeline.horizontal_instances.len() as _);
-            // equation rendering
-            render_pass.set_pipeline(&self.equation_pipeline.render_pipeline);
-            for line in &self.equation_pipeline.lines {
-                render_pass.set_bind_group(1, &line.color_bind_group, &[]);
-                render_pass.set_vertex_buffer(0, line.vertex_buffer.slice(..));
-                render_pass.set_index_buffer(line.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-                render_pass.draw_indexed(0..line.indices.len() as u32, 0, 0..1);
-            }
-            // point rendering
-            render_pass.set_pipeline(&self.point_pipeline.render_pipeline);
-            render_pass.set_vertex_buffer(0, self.point_pipeline.vertex_buffer.slice(..));
-            render_pass.set_vertex_buffer(1, self.point_pipeline.instance_buffer.slice(..));
-            render_pass.set_index_buffer(self.point_pipeline.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            render_pass.draw_indexed(0..self.point_pipeline.num_indices, 0, 0..self.point_pipeline.instances.len() as _);
-
-            self.grid_text.text_renderer.render(&self.grid_text.atlas, &self.grid_text.viewport, &mut render_pass).unwrap();
+        // equation rendering 
+        render_pass.set_pipeline(&self.equation_pipeline.render_pipeline);
+        for line in self.equation_pipeline.lines.values() {
+            render_pass.set_bind_group(1, &line.color_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, line.vertex_buffer.slice(..));
+            render_pass.set_index_buffer(line.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            render_pass.draw_indexed(0..line.indices.len() as u32, 0, 0..1);
         }
+        // point rendering
+        render_pass.set_pipeline(&self.point_pipeline.render_pipeline);
+        render_pass.set_vertex_buffer(0, self.point_pipeline.vertex_buffer.slice(..));
+        render_pass.set_vertex_buffer(1, self.point_pipeline.instance_buffer.slice(..));
+        render_pass.set_index_buffer(self.point_pipeline.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+        render_pass.draw_indexed(0..self.point_pipeline.num_indices, 0, 0..self.point_pipeline.instances.len() as _);
         
-        self.queue.submit(std::iter::once(encoder.finish()));
-        output.present();
-        self.grid_text.atlas.trim();
+        self.grid_text.text_renderer.render(&self.grid_text.atlas, &self.grid_text.viewport, render_pass).unwrap(); 
 
         Ok(())
     }
 
-    pub fn add_line(&mut self, coeffs: Vec<f32>, color: geometry::Color<f32>) -> bool {
-        self.equation_pipeline.add_line(&self.device, coeffs, color)
+    pub fn trim_atlas(&mut self) {
+        self.grid_text.atlas.trim();
+    }
+    
+    pub fn add_line(&mut self, device: &wgpu::Device, label: u16, coeffs: Vec<f32>, color: geometry::Color<f32>) -> bool {
+        self.equation_pipeline.add_line(device, label, coeffs, color)
     }
 
-    pub fn add_point(&mut self, point: geometry::Vertex) -> bool {
-        self.point_pipeline.add_point(&self.queue, point)
+    pub fn update_line(&mut self, label: u16, equation: &str) -> bool {
+        self.equation_pipeline.update_line(label, equation)
+    }
+
+    pub fn add_point(&mut self, queue: &wgpu::Queue, point: geometry::Vertex) -> bool {
+        self.point_pipeline.add_point(queue, point)
     }
 }
 
