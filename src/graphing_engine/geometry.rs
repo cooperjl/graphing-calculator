@@ -181,8 +181,6 @@ fn polynomial_equation(x: f32, coeffs: &[f32]) -> f32 {
     coeffs.iter().enumerate()
         .map(|(i, coeff)| coeff * x.powi(i as i32))
         .sum::<f32>()
-        //.min(max_y)
-        //.max(min_y)
 }
 
 pub struct Line {
@@ -257,10 +255,19 @@ impl Line {
         }
     }
 
-    pub fn make_polynomial(&mut self, x_min: i32, x_max: i32) {
+    pub fn update_polynomial(&mut self, x_min: i32, x_max: i32) -> bool {
         self.indices = Vec::new();
         self.vertices = Vec::new();
-        
+
+        if self.coeffs.is_empty() {
+            false
+        } else {
+            self.make_polynomial(x_min, x_max);
+            true
+        }
+    }
+
+    fn make_polynomial(&mut self, x_min: i32, x_max: i32) {
         let step_size = (x_max.abs().saturating_add(x_min.saturating_abs()) as f32 / 40.0).ceil() as usize;
         let unit = 20;
 

@@ -2,9 +2,11 @@ use wgpu::{self, util::DeviceExt, include_wgsl};
 use cgmath::prelude::*;
 use regex::Regex;
 use anyhow::Result;
+use std::collections::HashMap;
 
 use crate::graphing_engine::camera;
-use crate::graphing_engine::geometry::{Vertex, Instance, InstanceRaw, Color, Circle, Line};
+use crate::graphing_engine::geometry::*;
+
 
 fn create_render_pipeline(
     device: &wgpu::Device,
@@ -233,8 +235,10 @@ fn parse_equation(equation: &str) -> Result<Vec<f32>> {
         };
         
         let first = parts.first().unwrap();
-        let val = if first.is_empty() {
+        let val = if first.is_empty() || first.chars().all(|c| c == '+') {
             1.0
+        } else if first.chars().all(|c| c == '-') {
+            -1.0
         } else {
             first.parse::<f32>()?
         };
@@ -253,12 +257,16 @@ fn parse_equation(equation: &str) -> Result<Vec<f32>> {
 
 pub struct EquationPipeline {
     pub render_pipeline: wgpu::RenderPipeline,
-    pub lines: Vec<Line>,
+    pub lines: HashMap<u16, Line>,
     color_bind_group_layout: wgpu::BindGroupLayout,
 }
 
 impl EquationPipeline {
-    pub fn new(device: &wgpu::Device, pipeline_layout: &wgpu::PipelineLayout, color_bind_group_layout: wgpu::BindGroupLayout, format: wgpu::TextureFormat) -> Self {
+    pub fn new(device: &wgpu::Device,
+        pipeline_layout: &wgpu::PipelineLayout,
+        color_bind_group_layout: wgpu::BindGroupLayout, 
+        format: wgpu::TextureFormat
+    ) -> Self {
         let render_pipeline = create_render_pipeline(
             device, 
             pipeline_layout, 
@@ -268,7 +276,7 @@ impl EquationPipeline {
             wgpu::PrimitiveTopology::TriangleList,
         );
         
-        let lines = Vec::new();
+        let lines = HashMap::new();
 
         Self {
             render_pipeline,
@@ -277,14 +285,30 @@ impl EquationPipeline {
         }
     }
 
-    pub fn add_line(&mut self, device: &wgpu::Device, label: u32, coeffs: Vec<f32>, color: Color<f32>) -> bool {
+    pub fn add_line(&mut self, device: &wgpu::Device, label: u16, coeffs: Vec<f32>, color: Color<f32>) -> bool {
         // TODO: use dict with label
         let line = Line::new(device, coeffs, 0.025, color, &self.color_bind_group_layout);
-        self.lines.push(line);
+        self.lines.insert(label, line);
         true
     }
 
-    pub fn update_line(&mut self, label: u32, equation: &str) -> bool {
+    pub fn update_line(&mut self, label: u16, equation: &str) -> bool {
+        match self.lines.get_mut(&label) {
+            Some(line) => match parse_equation(equation) {
+                Ok(coeffs) => {
+                    line.coeffs = coeffs;
+                    true
+
+                }
+                Err(_) => {
+                    line.coeffs = Vec::new();
+                    false
+                }
+
+            }
+            None => false
+        }
+        /*
         match parse_equation(equation) {
             Ok(coeffs) => {
                 match self.lines.get_mut(label as usize) {
@@ -296,8 +320,11 @@ impl EquationPipeline {
                 }
 
             }
-            Err(_) => false, // TODO: remove line in this case since it is broken
+            Err(_) => {
+                false // TODO: remove line in this case since it is broken
+            }
         }
+        */
     }
 
     pub fn update_equations(&mut self, queue: &wgpu::Queue, camera: &camera::Camera) {
@@ -306,9 +333,9 @@ impl EquationPipeline {
         let x_min = -range + camera.eye.x;
         let x_max = range + camera.eye.x;
 
-        for line in &mut self.lines {
+        for line in &mut self.lines.values_mut() {
             line.width = width;
-            line.make_polynomial(x_min as i32, x_max as i32);
+            line.update_polynomial(x_min as i32, x_max as i32);
             line.update_buffers(queue);
         }
     }
@@ -538,7 +565,5 @@ mod tests {
 
         assert!(coeffs.is_err());
     }
-
-
 }
 

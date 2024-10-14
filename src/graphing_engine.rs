@@ -181,7 +181,7 @@ impl State {
 
         // equation rendering 
         render_pass.set_pipeline(&self.equation_pipeline.render_pipeline);
-        for line in &self.equation_pipeline.lines {
+        for line in self.equation_pipeline.lines.values() {
             render_pass.set_bind_group(1, &line.color_bind_group, &[]);
             render_pass.set_vertex_buffer(0, line.vertex_buffer.slice(..));
             render_pass.set_index_buffer(line.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
@@ -203,11 +203,11 @@ impl State {
         self.grid_text.atlas.trim();
     }
     
-    pub fn add_line(&mut self, device: &wgpu::Device, label: u32, coeffs: Vec<f32>, color: geometry::Color<f32>) -> bool {
+    pub fn add_line(&mut self, device: &wgpu::Device, label: u16, coeffs: Vec<f32>, color: geometry::Color<f32>) -> bool {
         self.equation_pipeline.add_line(device, label, coeffs, color)
     }
 
-    pub fn update_line(&mut self, label: u32, equation: &str) -> bool {
+    pub fn update_line(&mut self, label: u16, equation: &str) -> bool {
         self.equation_pipeline.update_line(label, equation)
     }
 
