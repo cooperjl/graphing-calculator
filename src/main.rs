@@ -132,9 +132,14 @@ impl AppState {
         };
 
         let mut graphing_engine = State::new(&device, &queue, &config);
-
+        
+        // TODO: remove hardcoded lines
         let color = Color { r: 1.0, g: 0.0, b: 0.0, a: 1.0 };
         graphing_engine.add_line(&device, 0, Vec::new(), color);
+        let color = Color { r: 0.0, g: 1.0, b: 0.0, a: 1.0 };
+        graphing_engine.add_line(&device, 1, Vec::new(), color);
+        let color = Color { r: 0.0, g: 0.0, b: 1.0, a: 1.0 };
+        graphing_engine.add_line(&device, 2, Vec::new(), color);
 
         let gui_renderer = gui::GuiRenderer::new(&device, &window_arc, config.format);
 
@@ -172,7 +177,10 @@ impl AppState {
 
     pub fn input(&mut self, event: &WindowEvent) -> bool {
         // TODO: should do this when the input box changes only.
-        self.graphing_engine.update_line(0, &self.gui_renderer.equation);
+        for (i, equation) in self.gui_renderer.equations.iter().enumerate() {
+            self.graphing_engine.update_line(i as u16, equation);
+
+        }
 
         self.gui_renderer.input(&self.window, event) || self.graphing_engine.input(event)
     }

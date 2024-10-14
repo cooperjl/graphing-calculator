@@ -2,7 +2,7 @@ pub struct GuiRenderer {
     egui_state: egui_winit::State,
     egui_renderer: egui_wgpu::Renderer,
 
-    pub equation: String,
+    pub equations: Vec<String>,
 }
 
 impl GuiRenderer {
@@ -29,13 +29,13 @@ impl GuiRenderer {
             false,
         );
 
-        let equation = String::new();
+        let equations = Vec::new();
 
         Self {
             egui_state,
             egui_renderer,
 
-            equation,
+            equations,
         }
     }
 
@@ -49,7 +49,6 @@ impl GuiRenderer {
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
         window: &winit::window::Window,
-        //render_pass: &mut wgpu::RenderPass<'static>,
         view: &wgpu::TextureView,
         screen_descriptor: &egui_wgpu::ScreenDescriptor,
     ) {
@@ -62,10 +61,16 @@ impl GuiRenderer {
                 egui::Id::new("left panel")
             ).show(ctx, |ui| {
                 ui.label("Equations");
-                let response = ui.text_edit_singleline(&mut self.equation);
+                if ui.button("+").clicked() {
+                    self.equations.push(String::new());
+                    println!("clickde");
+                }
+                for equation in self.equations.iter_mut() {
+                    let response = ui.text_edit_singleline(equation);
 
-                if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                    println!("{}", self.equation);
+                    if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                        println!("{}", equation);
+                    }
                 }
             });
         });
