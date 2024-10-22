@@ -1,8 +1,6 @@
 pub struct GuiRenderer {
     egui_state: egui_winit::State,
     egui_renderer: egui_wgpu::Renderer,
-
-    pub equations: Vec<String>,
 }
 
 impl GuiRenderer {
@@ -29,18 +27,24 @@ impl GuiRenderer {
             false,
         );
 
-        let equations = Vec::new();
 
         Self {
             egui_state,
             egui_renderer,
-
-            equations,
         }
     }
 
     pub fn input(&mut self, window: &winit::window::Window, event: &winit::event::WindowEvent) -> bool {
         self.egui_state.on_window_event(window, event).consumed
+    }
+
+    pub fn ctx(&self) -> &egui::Context {
+        self.egui_state.egui_ctx()
+    }
+
+    pub fn begin_pass(&mut self, window: &winit::window::Window) {
+        let input = self.egui_state.take_egui_input(window);
+        self.ctx().begin_pass(input);
     }
 
     pub fn render(
@@ -52,34 +56,15 @@ impl GuiRenderer {
         view: &wgpu::TextureView,
         screen_descriptor: &egui_wgpu::ScreenDescriptor,
     ) {
-        self.egui_state.egui_ctx().set_pixels_per_point(screen_descriptor.pixels_per_point);
+        self.ctx().set_pixels_per_point(screen_descriptor.pixels_per_point);
 
-        let input = self.egui_state.take_egui_input(window);
-        let full_output = self.egui_state.egui_ctx().run(input, |ctx| {
-            egui::SidePanel::new(
-                egui::panel::Side::Left,
-                egui::Id::new("left panel")
-            ).show(ctx, |ui| {
-                ui.label("Equations");
-                if ui.button("+").clicked() {
-                    self.equations.push(String::new());
-                    println!("clickde");
-                }
-                for equation in self.equations.iter_mut() {
-                    let response = ui.text_edit_singleline(equation);
-
-                    if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                        println!("{}", equation);
-                    }
-                }
-            });
-        });
+        let full_output = self.ctx().end_pass();
 
         self.egui_state.handle_platform_output(window, full_output.platform_output);
 
-        let triangles = self.egui_state.egui_ctx().tessellate(
+        let triangles = self.ctx().tessellate(
             full_output.shapes, 
-            self.egui_state.egui_ctx().pixels_per_point(),
+            self.ctx().pixels_per_point(),
         );
         for (id, image_delta) in &full_output.textures_delta.set {
             self.egui_renderer.update_texture(device, queue, *id, image_delta);

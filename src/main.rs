@@ -9,6 +9,7 @@ use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::window::{Window, WindowId};
 use winit::dpi::PhysicalSize;
+use rand::Rng;
 
 use graphing_engine::State;
 use graphing_engine::Color;
@@ -86,6 +87,8 @@ struct AppState {
     graphing_engine: graphing_engine::State,
     gui_renderer: gui::GuiRenderer,
 
+    equations: Vec<String>,
+
 }
 
 impl AppState {
@@ -131,17 +134,11 @@ impl AppState {
             desired_maximum_frame_latency: 2,
         };
 
-        let mut graphing_engine = State::new(&device, &queue, &config);
+        let graphing_engine = State::new(&device, &queue, &config);
         
-        // TODO: remove hardcoded lines
-        let color = Color { r: 1.0, g: 0.0, b: 0.0, a: 1.0 };
-        graphing_engine.add_line(&device, 0, Vec::new(), color);
-        let color = Color { r: 0.0, g: 1.0, b: 0.0, a: 1.0 };
-        graphing_engine.add_line(&device, 1, Vec::new(), color);
-        let color = Color { r: 0.0, g: 0.0, b: 1.0, a: 1.0 };
-        graphing_engine.add_line(&device, 2, Vec::new(), color);
-
         let gui_renderer = gui::GuiRenderer::new(&device, &window_arc, config.format);
+
+        let equations = Vec::new();
 
         Self {
             surface,
@@ -152,6 +149,7 @@ impl AppState {
             window: window_arc,
             graphing_engine,
             gui_renderer,
+            equations,
         }
     }
 
@@ -176,12 +174,6 @@ impl AppState {
     }
 
     pub fn input(&mut self, event: &WindowEvent) -> bool {
-        // TODO: should do this when the input box changes only.
-        for (i, equation) in self.gui_renderer.equations.iter().enumerate() {
-            self.graphing_engine.update_line(i as u16, equation);
-
-        }
-
         self.gui_renderer.input(&self.window, event) || self.graphing_engine.input(event)
     }
 
@@ -217,19 +209,47 @@ impl AppState {
             }
         }
 
-        let screen_descriptor = egui_wgpu::ScreenDescriptor {
-            size_in_pixels: [self.config.width, self.config.height],
-            pixels_per_point: self.window().scale_factor() as f32 * 1.0,
-        };
+        {
+            let screen_descriptor = egui_wgpu::ScreenDescriptor {
+                size_in_pixels: [self.config.width, self.config.height],
+                pixels_per_point: self.window().scale_factor() as f32 * 1.0,
+            };
 
-        self.gui_renderer.render(
-            &self.device,
-            &self.queue,
-            &mut encoder,
-            &self.window,
-            &view,
-            &screen_descriptor,
-        );
+            self.gui_renderer.begin_pass(&self.window);
+
+            egui::SidePanel::new(
+                egui::panel::Side::Left, 
+                egui::Id::new("left panel")
+                )
+                .show(self.gui_renderer.ctx(), |ui| {
+                    ui.label("Equations");
+                    if ui.button("+").clicked() {
+                        self.equations.push(String::new());
+                        let r = rand::thread_rng().gen_range(0.0..=1.0);
+                        let g = rand::thread_rng().gen_range(0.0..=1.0);
+                        let b = rand::thread_rng().gen_range(0.0..=1.0);
+                        let color = Color { r, g, b, a: 1.0 };
+
+                        self.graphing_engine.add_line(&self.device, self.equations.len() as u16 - 1, Vec::new(), color);
+                    }
+                    for (i, equation) in self.equations.iter_mut().enumerate() {
+                        let response = ui.text_edit_singleline(equation);
+
+                        if response.changed() {
+                            self.graphing_engine.update_line(i as u16, equation);
+                        }
+                    }
+                });
+
+            self.gui_renderer.render(
+                &self.device,
+                &self.queue,
+                &mut encoder,
+                &self.window,
+                &view,
+                &screen_descriptor,
+            );
+        }
 
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
